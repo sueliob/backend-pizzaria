@@ -354,7 +354,18 @@ const FALLBACK_FLAVORS = [
   }
 ];
 
+// Debug function for logging
+function debugLog(message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] [NETLIFY] ${message}`);
+  if (data) {
+    console.log(`[${timestamp}] [NETLIFY] Data:`, JSON.stringify(data, null, 2));
+  }
+}
+
 export const handler: Handler = async (event: HandlerEvent) => {
+  const startTime = Date.now();
+  
   // CORS headers - permitir seu domínio específico
   // Frontend já usa VITE_API_URL - CORS pode ser mais flexível
   const origin = event.headers.origin || '';
@@ -368,8 +379,20 @@ export const handler: Handler = async (event: HandlerEvent) => {
     'Content-Type': 'application/json'
   };
 
+  const path = event.path.replace('/.netlify/functions/api', '') || '/';
+  const method = event.httpMethod;
+  
+  // Debug log da requisição entrante
+  debugLog(`🔄 ${method} ${path}`, {
+    origin,
+    userAgent: event.headers['user-agent'],
+    body: event.body ? JSON.parse(event.body) : null,
+    queryStringParameters: event.queryStringParameters
+  });
+
   // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
+    debugLog(`⚙️ CORS preflight request`);
     return {
       statusCode: 200,
       headers,
@@ -377,20 +400,19 @@ export const handler: Handler = async (event: HandlerEvent) => {
     };
   }
 
-  const path = event.path.replace('/.netlify/functions/api', '') || '/';
-  const method = event.httpMethod;
-
   try {
     // Root endpoint
     if (path === '/' && method === 'GET') {
+      const response = { 
+        message: 'Pizzaria API Online com 10 Sabores!', 
+        status: 'ok',
+        timestamp: new Date().toISOString()
+      };
+      debugLog(`✅ Root endpoint response`, response);
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ 
-          message: 'Pizzaria API Online com 10 Sabores!', 
-          status: 'ok',
-          timestamp: new Date().toISOString()
-        })
+        body: JSON.stringify(response)
       };
     }
 
@@ -542,7 +564,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
         
         if (GOOGLE_API_KEY && address) {
-          console.log('🗺️ Usando Google Maps API para cálculo preciso');
+          debugLog('🗺️ Usando Google Maps API para cálculo preciso', { cep, address });
           
           const fullAddress = `${address.street}, ${address.number || ''}, ${address.neighborhood}, ${address.city} - ${address.state}, ${cep}`;
           
@@ -605,17 +627,17 @@ export const handler: Handler = async (event: HandlerEvent) => {
                 usedGoogleMaps: true
               };
               
-              console.log('✅ Google Maps cálculo preciso:', deliveryData);
+              debugLog('✅ Google Maps cálculo preciso', deliveryData);
             }
           }
         }
       } catch (error) {
-        console.error('❌ Erro Google Maps, usando fallback:', error);
+        debugLog('❌ Erro Google Maps, usando fallback', error);
       }
       
       // Fallback: usar cálculo CEP se Google Maps falhar
       if (!deliveryData) {
-        console.log('🔄 Usando fallback CEP');
+        debugLog('🔄 Usando fallback CEP', { cep });
         const result = calculateDeliveryFromCEP(cep);
         deliveryData = {
           ...result,
@@ -623,6 +645,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         };
       }
       
+      debugLog('💰 Cálculo de entrega finalizado', deliveryData);
       return {
         statusCode: 200,
         headers,
@@ -1446,6 +1469,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
     }
 
     // Not found
+    debugLog(`❌ Endpoint não encontrado: ${method} ${path}`);
     return {
       statusCode: 404,
       headers,
@@ -1453,7 +1477,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
     };
 
   } catch (error: any) {
-    console.error('Function error:', error);
+    const duration = Date.now() - startTime;
+    debugLog(`🔥 Erro interno do servidor (${duration}ms)`, error);
     return {
       statusCode: 500,
       headers,
@@ -1462,5 +1487,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
         message: error.message || 'Unknown error'
       })
     };
+  } finally {
+    const duration = Date.now() - startTime;
+    debugLog(`⏱️ Request finalizada em ${duration}ms`);
   }
 };
