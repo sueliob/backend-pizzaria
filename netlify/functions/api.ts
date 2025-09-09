@@ -363,21 +363,46 @@ function debugLog(message: string, data?: any) {
   }
 }
 
-export const handler: Handler = async (event: HandlerEvent) => {
-  const startTime = Date.now();
+// CORS configuration from environment
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'https://frontend-pizzaria.pages.dev,http://localhost:3000,http://localhost:5000')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+// CORS helper function
+function getCorsHeaders(origin: string | undefined) {
+  let allowedOrigin = '';
   
-  // CORS headers - permitir seu domínio específico
-  // Frontend já usa VITE_API_URL - CORS pode ser mais flexível
-  const origin = event.headers.origin || '';
-  const corsOrigin = origin || '*';
+  if (!origin) {
+    // curl/postman requests
+    allowedOrigin = '*';
+  } else if (ALLOWED_ORIGINS.includes(origin)) {
+    allowedOrigin = origin;
+  } else {
+    // Origin not allowed - return empty, will cause CORS error
+    allowedOrigin = '';
+  }
   
-  const headers = {
-    'Access-Control-Allow-Origin': corsOrigin,
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Credentials': 'true',
     'Content-Type': 'application/json'
   };
+}
+
+export const handler: Handler = async (event: HandlerEvent) => {
+  const startTime = Date.now();
+  
+  const origin = event.headers.origin;
+  const headers = getCorsHeaders(origin);
+  
+  // Log CORS decision
+  if (origin) {
+    const allowed = ALLOWED_ORIGINS.includes(origin);
+    debugLog(`🔒 CORS Check: ${origin} - ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
+  }
 
   const path = event.path.replace('/.netlify/functions/api', '') || '/';
   const method = event.httpMethod;
@@ -392,11 +417,21 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
   // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    debugLog(`⚙️ CORS preflight request`);
+    debugLog(`⚙️ CORS preflight request from ${origin}`);
     return {
-      statusCode: 200,
+      statusCode: 204,
       headers,
       body: ''
+    };
+  }
+  
+  // Block requests from non-allowed origins (except non-browser requests)
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    debugLog(`❌ Origin blocked: ${origin}`);
+    return {
+      statusCode: 403,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Origin not allowed' })
     };
   }
 
