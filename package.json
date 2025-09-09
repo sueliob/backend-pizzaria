@@ -1,0 +1,20 @@
+{
+  "name": "pizzaria-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'Build complete'",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "cloudinary": "^2.0.0",
+    "@netlify/functions": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.11",
+    "netlify-cli": "^17.0.0",
+    "typescript": "5.6.3"
+  }
+}

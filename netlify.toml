@@ -1,0 +1,10 @@
+[build]
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_ENV = "production"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
