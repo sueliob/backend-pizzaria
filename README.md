@@ -5,18 +5,21 @@ Backend Express.js completo com painel administrativo, sistema de upload de imag
 ## ✨ Principais Funcionalidades
 
 ### 🔧 **APIs RESTful Completas**
-- **Sabores**: CRUD completo com categorização
+- **Sabores**: CRUD completo + bulk import para produção
+- **Extras**: CRUD completo + bulk import para ingredientes
+- **Tipos de Massa**: CRUD completo + bulk import
 - **Pedidos**: Criação, consulta e gerenciamento
-- **Admin**: Autenticação JWT e painel de controle
+- **Admin**: Sistema completo de usuários multi-role
 - **Upload**: Sistema seguro de imagens com Cloudinary
-- **Geolocalização**: Cálculo de entrega com Google Maps
+- **Geolocalização**: Cálculo inteligente com cache CEP
 
-### 👨‍💼 **Sistema Administrativo**
-- Autenticação JWT com refresh tokens
-- Gerenciamento de sabores e ingredientes
-- Configurações da pizzaria (horários, contato)
-- Dashboard com estatísticas em tempo real
-- Controle de preços e categorias
+### 👨‍💼 **Sistema Administrativo Avançado**
+- **Autenticação robusta**: JWT + sistema de usuários multi-role
+- **Bulk Import**: Importação em massa de produtos (CSV/JSON)
+- **Gerenciamento completo**: Sabores, extras, tipos de massa
+- **Configurações**: Pizzaria (horários, contato, delivery)
+- **Dashboard**: Estatísticas em tempo real + analytics
+- **Cache inteligente**: Performance otimizada para CEPs
 
 ### 📸 **Sistema de Upload Inteligente**
 - Upload direto para Cloudinary
@@ -25,12 +28,47 @@ Backend Express.js completo com painel administrativo, sistema de upload de imag
 - Validação de tipos e tamanhos
 - Fallbacks para diferentes formatos
 
-### 🗺️ **Cálculo de Entrega Avançado**
-- Integração com Google Maps Distance Matrix
-- Cálculo por distância real (não linha reta)
-- Suporte a diferentes tipos de veículo
-- Fallback para cálculo por CEP
-- Cache inteligente de rotas
+### 🗺️ **Sistema de Entrega Inteligente**
+- **Google Maps**: Distância real com routing otimizado
+- **Cache CEP**: PostgreSQL para performance máxima
+- **Fallback robusto**: Múltiplas fontes de dados
+- **Suporte multi-veículo**: Moto, carro, bicicleta
+- **Auto-save**: Cache automático de coordenadas consultadas
+
+## 🔥 **NOVOS ENDPOINTS - BULK IMPORT**
+
+### **🧀 Import de Extras**
+```bash
+POST /api/admin/bulk-import-extras
+Authorization: Bearer admin_token
+
+{
+  "extras": [
+    {"name": "Calabresa", "price": "3.50", "category": "salgadas"},
+    {"name": "Bacon", "price": "4.00", "category": "salgadas"},
+    {"name": "Chocolate", "price": "2.00", "category": "doces"}
+  ]
+}
+```
+
+### **🥖 Import de Tipos de Massa**
+```bash
+POST /api/admin/bulk-import-dough-types
+Authorization: Bearer admin_token
+
+{
+  "doughTypes": [
+    {"name": "Massa Tradicional", "price": "0.00", "category": "salgadas"},
+    {"name": "Borda Recheada", "price": "5.00", "category": "salgadas"},
+    {"name": "Massa Chocolate", "price": "3.00", "category": "doces"}
+  ]
+}
+```
+
+### **⚡ Cache CEP Automático**
+- **Performance**: Consultas CEP em cache PostgreSQL
+- **Fallback inteligente**: Google Maps → ViaCEP → Hardcoded
+- **Auto-save**: Todas as consultas salvas automaticamente
 
 ## 🚀 Deploy no Netlify
 
@@ -89,13 +127,22 @@ npm run dev
 
 ## 📡 Endpoints da API
 
-### **🍕 Sabores**
+### **🍕 Sabores & Produtos**
 ```
-GET    /api/flavors              # Listar todos os sabores
-GET    /api/flavors/:category    # Sabores por categoria
-POST   /api/admin/flavors        # Criar sabor (AUTH)
-PUT    /api/admin/flavors/:id    # Atualizar sabor (AUTH)
-DELETE /api/admin/flavors/:id    # Excluir sabor (AUTH)
+GET    /api/flavors                        # Listar todos os sabores
+GET    /api/flavors/:category              # Sabores por categoria
+POST   /api/admin/flavors                  # Criar sabor (AUTH)
+PUT    /api/admin/flavors/:id              # Atualizar sabor (AUTH)
+DELETE /api/admin/flavors/:id              # Excluir sabor (AUTH)
+POST   /api/admin/bulk-import-flavors      # Import em massa (AUTH)
+
+# Extras (ingredientes)
+GET    /api/extras                         # Listar extras
+POST   /api/admin/bulk-import-extras       # Import em massa (AUTH)
+
+# Tipos de massa
+GET    /api/dough-types                    # Listar tipos
+POST   /api/admin/bulk-import-dough-types  # Import em massa (AUTH)
 ```
 
 ### **📋 Pedidos**
@@ -119,10 +166,10 @@ GET    /api/admin/dashboard     # Estatísticas
 POST   /api/upload-image        # Upload para Cloudinary
 ```
 
-### **🗺️ Geolocalização**
+### **🗺️ Geolocalização & Cache**
 ```
-POST   /api/calculate-distance  # Calcular distância/taxa
-GET    /api/public/contact      # Dados de contato
+POST   /api/calculate-delivery  # Calcular com cache CEP otimizado
+GET    /api/public/contact      # Dados de contato da pizzaria
 ```
 
 ## 🏗️ Arquitetura
@@ -193,6 +240,16 @@ flavors (
   ingredients, image_url, available, created_at
 )
 
+-- Extras (ingredientes adicionais)
+extras (
+  id, name, price, category, available, created_at
+)
+
+-- Tipos de massa
+dough_types (
+  id, name, price, category, description, created_at
+)
+
 -- Pedidos  
 orders (
   id, customer_name, customer_phone, items,
@@ -201,14 +258,19 @@ orders (
 
 -- Configurações
 pizzeria_settings (
-  id, name, whatsapp, address, delivery_fee,
-  opening_hours, created_at, updated_at
+  id, section, data, created_at, updated_at
 )
 
--- Admins
+-- Sistema de usuários admin
 admin_users (
-  id, username, password_hash, role,
-  last_login, created_at
+  id, username, email, password_hash, role,
+  is_active, last_login, created_at, updated_at
+)
+
+-- Cache CEP para performance
+cep_cache (
+  id, cep, coordinates, address, source,
+  created_at, updated_at
 )
 ```
 
@@ -355,7 +417,16 @@ DATABASE_URL=postgresql://staging...
 FRONTEND_URL=https://preview--pizzaria.pages.dev
 ```
 
-## 🎯 Próximas Melhorias
+## 🎯 Melhorias Implementadas
+
+- [x] **Bulk Import System**: Importação em massa de produtos
+- [x] **Cache CEP Inteligente**: Performance otimizada para entrega
+- [x] **Sistema Admin Robusto**: Multi-usuário com roles
+- [x] **Zero Hardcoded Data**: 100% database-driven
+- [x] **CORS Profissional**: Validação de origem por ambiente
+- [x] **PostgreSQL Full**: Todas as entidades no banco
+
+## 🔮 Próximas Melhorias
 
 - [ ] WebSocket para pedidos em tempo real
 - [ ] Sistema de filas com Redis  
