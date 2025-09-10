@@ -145,3 +145,60 @@ export const addressSchema = z.object({
 });
 
 export type Address = z.infer<typeof addressSchema>;
+
+// Admin users table
+export const adminUsers = pgTable("admin_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("admin"), // 'admin', 'manager', 'owner'
+  isActive: boolean("is_active").default(true),
+  lastLogin: timestamp("last_login"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// CEP cache table for performance
+export const cepCache = pgTable("cep_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cep: text("cep").notNull().unique(),
+  coordinates: jsonb("coordinates").notNull(), // { lat: number, lng: number }
+  address: jsonb("address"), // { street, neighborhood, city, state }
+  source: text("source").notNull(), // 'google_maps', 'viacep', 'manual'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCepCacheSchema = createInsertSchema(cepCache).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Bulk import schemas for admin
+export const bulkImportFlavorsSchema = z.object({
+  flavors: z.array(insertPizzaFlavorSchema).min(1, "Pelo menos um sabor é necessário")
+});
+
+export const bulkImportExtrasSchema = z.object({
+  extras: z.array(insertExtraSchema).min(1, "Pelo menos um extra é necessário")
+});
+
+export const bulkImportDoughTypesSchema = z.object({
+  doughTypes: z.array(insertDoughTypeSchema).min(1, "Pelo menos um tipo de massa é necessário")
+});
+
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+export type CepCache = typeof cepCache.$inferSelect;
+export type InsertCepCache = z.infer<typeof insertCepCacheSchema>;
+export type BulkImportFlavors = z.infer<typeof bulkImportFlavorsSchema>;
+export type BulkImportExtras = z.infer<typeof bulkImportExtrasSchema>;
+export type BulkImportDoughTypes = z.infer<typeof bulkImportDoughTypesSchema>;

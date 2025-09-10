@@ -1,5 +1,6 @@
 import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { DatabaseStorage } from '../../src/storage';
+import { bulkImportFlavorsSchema, bulkImportExtrasSchema, bulkImportDoughTypesSchema } from '../../shared/schema';
 
 // Initialize storage
 const storage = new DatabaseStorage();
@@ -55,6 +56,7 @@ async function migrateSettingsToDatabase() {
     throw error;
   }
 }
+
 
 // Função para conectar direto ao PostgreSQL via HTTP
 async function queryDatabase(query: string, params: any[] = []) {
@@ -467,12 +469,14 @@ export const handler: Handler = async (event: HandlerEvent) => {
     if (path === '/flavors' && method === 'GET') {
       try {
         const flavors = await storage.getAllFlavors();
+        debugLog(`✅ Retornando ${flavors.length} sabores do PostgreSQL`);
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify(flavors)
         };
       } catch (error) {
+        debugLog(`❌ Erro ao buscar sabores do banco:`, error);
         // Fallback em caso de erro
         return {
           statusCode: 200,
@@ -487,12 +491,14 @@ export const handler: Handler = async (event: HandlerEvent) => {
       try {
         const category = path.split('/')[2];
         const categoryFlavors = await storage.getFlavorsByCategory(category);
+        debugLog(`✅ Retornando ${categoryFlavors.length} sabores da categoria ${category} do PostgreSQL`);
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify(categoryFlavors)
         };
       } catch (error) {
+        debugLog(`❌ Erro ao buscar sabores da categoria do banco:`, error);
         // Fallback em caso de erro
         const category = path.split('/')[2];
         const categoryFlavors = FALLBACK_FLAVORS.filter(f => f.category === category);
@@ -824,6 +830,197 @@ export const handler: Handler = async (event: HandlerEvent) => {
           statusCode: 500,
           headers,
           body: JSON.stringify({ error: 'Erro interno do servidor' })
+        };
+      }
+    }
+
+    // Admin - Bulk import flavors (NEW ENDPOINT)
+    if (path === '/admin/bulk-import-flavors' && method === 'POST') {
+      const token = event.headers.authorization?.replace('Bearer ', '');
+      if (!token || !token.startsWith('admin_')) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({ error: 'Token inválido' })
+        };
+      }
+
+      try {
+        // Validar dados de entrada
+        const requestData = JSON.parse(event.body || '{}');
+        const validatedData = bulkImportFlavorsSchema.parse(requestData);
+        
+        debugLog(`🍕 Iniciando import em massa de ${validatedData.flavors.length} sabores`);
+        
+        const results = {
+          success: 0,
+          errors: [],
+          imported: []
+        };
+        
+        // Importar cada sabor
+        for (const [index, flavor] of validatedData.flavors.entries()) {
+          try {
+            const createdFlavor = await storage.createFlavor(flavor);
+            results.success++;
+            results.imported.push({
+              name: createdFlavor.name,
+              id: createdFlavor.id
+            });
+            debugLog(`✅ Sabor importado: ${createdFlavor.name}`);
+          } catch (error) {
+            const errorMsg = `Erro no sabor ${index + 1} (${flavor.name}): ${error.message}`;
+            results.errors.push(errorMsg);
+            debugLog(`❌ ${errorMsg}`);
+          }
+        }
+        
+        debugLog(`🎉 Import concluído: ${results.success} sucessos, ${results.errors.length} erros`);
+        
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            message: `Import concluído: ${results.success} sabores importados`,
+            results: results
+          })
+        };
+        
+      } catch (error) {
+        debugLog(`❌ Erro na validação/import:`, error);
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Dados inválidos', 
+            details: error.message 
+          })
+        };
+      }
+    }
+
+    // Admin - Bulk import extras (NEW ENDPOINT)
+    if (path === '/admin/bulk-import-extras' && method === 'POST') {
+      const token = event.headers.authorization?.replace('Bearer ', '');
+      if (!token || !token.startsWith('admin_')) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({ error: 'Token inválido' })
+        };
+      }
+
+      try {
+        const requestData = JSON.parse(event.body || '{}');
+        const validatedData = bulkImportExtrasSchema.parse(requestData);
+        
+        debugLog(`🧀 Iniciando import em massa de ${validatedData.extras.length} extras`);
+        
+        const results = {
+          success: 0,
+          errors: [],
+          imported: []
+        };
+        
+        for (const [index, extra] of validatedData.extras.entries()) {
+          try {
+            const createdExtra = await storage.createExtra(extra);
+            results.success++;
+            results.imported.push({
+              name: createdExtra.name,
+              id: createdExtra.id
+            });
+            debugLog(`✅ Extra importado: ${createdExtra.name}`);
+          } catch (error) {
+            const errorMsg = `Erro no extra ${index + 1} (${extra.name}): ${error.message}`;
+            results.errors.push(errorMsg);
+            debugLog(`❌ ${errorMsg}`);
+          }
+        }
+        
+        debugLog(`🎉 Import de extras concluído: ${results.success} sucessos, ${results.errors.length} erros`);
+        
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            message: `Import concluído: ${results.success} extras importados`,
+            results: results
+          })
+        };
+        
+      } catch (error) {
+        debugLog(`❌ Erro na validação/import de extras:`, error);
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Dados inválidos', 
+            details: error.message 
+          })
+        };
+      }
+    }
+
+    // Admin - Bulk import dough types (NEW ENDPOINT)
+    if (path === '/admin/bulk-import-dough-types' && method === 'POST') {
+      const token = event.headers.authorization?.replace('Bearer ', '');
+      if (!token || !token.startsWith('admin_')) {
+        return {
+          statusCode: 401,
+          headers,
+          body: JSON.stringify({ error: 'Token inválido' })
+        };
+      }
+
+      try {
+        const requestData = JSON.parse(event.body || '{}');
+        const validatedData = bulkImportDoughTypesSchema.parse(requestData);
+        
+        debugLog(`🥖 Iniciando import em massa de ${validatedData.doughTypes.length} tipos de massa`);
+        
+        const results = {
+          success: 0,
+          errors: [],
+          imported: []
+        };
+        
+        for (const [index, doughType] of validatedData.doughTypes.entries()) {
+          try {
+            const createdDoughType = await storage.createDoughType(doughType);
+            results.success++;
+            results.imported.push({
+              name: createdDoughType.name,
+              id: createdDoughType.id
+            });
+            debugLog(`✅ Tipo de massa importado: ${createdDoughType.name}`);
+          } catch (error) {
+            const errorMsg = `Erro no tipo de massa ${index + 1} (${doughType.name}): ${error.message}`;
+            results.errors.push(errorMsg);
+            debugLog(`❌ ${errorMsg}`);
+          }
+        }
+        
+        debugLog(`🎉 Import de tipos de massa concluído: ${results.success} sucessos, ${results.errors.length} erros`);
+        
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            message: `Import concluído: ${results.success} tipos de massa importados`,
+            results: results
+          })
+        };
+        
+      } catch (error) {
+        debugLog(`❌ Erro na validação/import de tipos de massa:`, error);
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Dados inválidos', 
+            details: error.message 
+          })
         };
       }
     }

@@ -1,4 +1,4 @@
-import { type PizzaFlavor, type InsertPizzaFlavor, type Order, type InsertOrder, type Extra, type InsertExtra, type DoughType, type InsertDoughType, type PizzeriaSetting, type InsertPizzeriaSetting, extras, doughTypes, pizzaFlavors, pizzeriaSettings } from "@shared/schema";
+import { type PizzaFlavor, type InsertPizzaFlavor, type Order, type InsertOrder, type Extra, type InsertExtra, type DoughType, type InsertDoughType, type PizzeriaSetting, type InsertPizzeriaSetting, type AdminUser, type InsertAdminUser, type CepCache, type InsertCepCache, extras, doughTypes, pizzaFlavors, pizzeriaSettings, adminUsers, cepCache } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 
@@ -51,6 +51,20 @@ export interface IStorage {
   createSetting(setting: InsertPizzeriaSetting): Promise<PizzeriaSetting>;
   updateSetting(section: string, data: any): Promise<PizzeriaSetting | undefined>;
   deleteSetting(section: string): Promise<boolean>;
+  
+  // Admin Users
+  getAllAdminUsers(): Promise<AdminUser[]>;
+  getAdminUser(id: string): Promise<AdminUser | undefined>;
+  getAdminUserByUsername(username: string): Promise<AdminUser | undefined>;
+  getAdminUserByEmail(email: string): Promise<AdminUser | undefined>;
+  createAdminUser(user: InsertAdminUser): Promise<AdminUser>;
+  updateAdminUser(id: string, updates: Partial<AdminUser>): Promise<AdminUser | undefined>;
+  deleteAdminUser(id: string): Promise<boolean>;
+  
+  // CEP Cache
+  getCepFromCache(cep: string): Promise<CepCache | undefined>;
+  setCepCache(cepData: InsertCepCache): Promise<CepCache>;
+  updateCepCache(cep: string, updates: Partial<CepCache>): Promise<CepCache | undefined>;
 }
 
 export class MemStorage implements IStorage {
