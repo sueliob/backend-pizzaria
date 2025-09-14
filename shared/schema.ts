@@ -24,6 +24,7 @@ export const extras = pgTable("extras", {
   category: text("category").notNull(), // 'salgadas' or 'doces'
   available: boolean("available").default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Dough types table
@@ -35,6 +36,7 @@ export const doughTypes = pgTable("dough_types", {
   category: text("category").notNull(), // 'salgadas' or 'doces'
   available: boolean("available").default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const orders = pgTable("orders", {

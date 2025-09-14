@@ -293,22 +293,26 @@ export class DatabaseStorage implements IStorage {
   async getAllFlavors(): Promise<PizzaFlavor[]> {
     try {
       console.log('🔍 [DatabaseStorage] Getting all flavors...');
-      // DIAGNÓSTICO: Relaxar filtro available para encontrar dados
-      const result = await db.select().from(pizzaFlavors);
-      console.log(`📊 [DatabaseStorage] Found ${result.length} total flavors (no available filter)`);
+      // FIX: Select específico para evitar problema de schema
+      const result = await db.select({
+        id: pizzaFlavors.id,
+        name: pizzaFlavors.name,
+        description: pizzaFlavors.description,
+        prices: pizzaFlavors.prices,
+        category: pizzaFlavors.category,
+        imageUrl: pizzaFlavors.imageUrl,
+        available: pizzaFlavors.available
+      }).from(pizzaFlavors);
       
-      // Mostrar breakdown
-      const available = result.filter(f => f.available === true);
-      const unavailable = result.filter(f => f.available === false);
-      const nullAvailable = result.filter(f => f.available === null);
+      console.log(`📊 [DatabaseStorage] Found ${result.length} total flavors (specific select)`);
       
-      console.log(`📊 [DatabaseStorage] Breakdown: available=${available.length}, unavailable=${unavailable.length}, null=${nullAvailable.length}`);
+      // Retornar apenas available !== false
+      const filtered = result.filter(f => f.available !== false);
+      console.log(`📊 [DatabaseStorage] After filter: ${filtered.length} flavors`);
       
-      // Retornar todos por enquanto para diagnóstico
-      return result.filter(f => f.available !== false); // Include true and null
+      return filtered as PizzaFlavor[];
     } catch (error) {
       console.error('❌ [DatabaseStorage] Database error:', error);
-      // DIAGNÓSTICO: Não esconder erro mais
       throw error;
     }
   }
@@ -316,27 +320,45 @@ export class DatabaseStorage implements IStorage {
   async getFlavorsByCategory(category: string): Promise<PizzaFlavor[]> {
     try {
       console.log(`🔍 [DatabaseStorage] Searching category: ${category}`);
-      // DIAGNÓSTICO: Relaxar filtro available
-      const result = await db.select().from(pizzaFlavors)
+      // FIX: Select específico para evitar problema de schema
+      const result = await db.select({
+        id: pizzaFlavors.id,
+        name: pizzaFlavors.name,
+        description: pizzaFlavors.description,
+        prices: pizzaFlavors.prices,
+        category: pizzaFlavors.category,
+        imageUrl: pizzaFlavors.imageUrl,
+        available: pizzaFlavors.available
+      }).from(pizzaFlavors)
         .where(eq(pizzaFlavors.category, category));
-      console.log(`📊 [DatabaseStorage] Found ${result.length} flavors for category: ${category} (no available filter)`);
       
-      // Retornar apenas não-false por enquanto
-      return result.filter(f => f.available !== false);
+      console.log(`📊 [DatabaseStorage] Found ${result.length} flavors for category: ${category} (specific select)`);
+      
+      // Retornar apenas available !== false
+      const filtered = result.filter(f => f.available !== false);
+      console.log(`📊 [DatabaseStorage] After filter: ${filtered.length} flavors for ${category}`);
+      
+      return filtered as PizzaFlavor[];
     } catch (error) {
       console.error('❌ [DatabaseStorage] Database error:', error);
-      // DIAGNÓSTICO: Não esconder erro mais
       throw error;
     }
   }
 
   async getFlavor(id: string): Promise<PizzaFlavor | undefined> {
     try {
-      const [flavor] = await db.select().from(pizzaFlavors).where(eq(pizzaFlavors.id, id));
-      return flavor;
+      const [flavor] = await db.select({
+        id: pizzaFlavors.id,
+        name: pizzaFlavors.name,
+        description: pizzaFlavors.description,
+        prices: pizzaFlavors.prices,
+        category: pizzaFlavors.category,
+        imageUrl: pizzaFlavors.imageUrl,
+        available: pizzaFlavors.available
+      }).from(pizzaFlavors).where(eq(pizzaFlavors.id, id));
+      return flavor as PizzaFlavor | undefined;
     } catch (error) {
       console.error('Database error:', error);
-      // READ-ONLY MODE: Return undefined instead of fallback
       return undefined;
     }
   }

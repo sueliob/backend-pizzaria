@@ -75,37 +75,8 @@ async function migrateSettingsToDatabase() {
 }
 
 
-// Função para conectar direto ao PostgreSQL via HTTP
-async function queryDatabase(query: string, params: any[] = []) {
-  const DATABASE_URL = process.env.DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL not configured');
-  }
-
-  try {
-    // Usar fetch direto para PostgreSQL HTTP endpoint do Neon
-    const url = DATABASE_URL.replace('postgresql://', 'https://').replace(':5432', '') + '/sql';
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DATABASE_URL.split('@')[0].split('://')[1].split(':')[1]}`
-      },
-      body: JSON.stringify({ query, params })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Database query failed: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Database connection error:', error);
-    // Fallback para dados estáticos em caso de erro
-    return null;
-  }
-}
+// ✅ REMOVIDO: Função queryDatabase() problemática (Architect Security Fix)
+// Usando apenas @neondatabase/serverless driver seguro
 
 // Pizzeria configuration
 const PIZZERIA_ADDRESS = {
@@ -417,22 +388,44 @@ export const handler: Handler = async (event: HandlerEvent) => {
             process.env.DATABASE_URL.split('@')[1]?.split('/')[0] || 'unknown' : 'none'
         };
         
-        // 2. Test storage layer (main test)
-        const salgadasTest = await storage.getFlavorsByCategory('salgadas');
-        const allFlavorsTest = await storage.getAllFlavors();
+        // 2. VERIFICAR SCHEMA REAL DO NETLIFY (diagnóstico Architect)
+        const { db } = await import('../../src/db');
+        const { sql } = await import('drizzle-orm');
         
-        console.log(`🔍 [Health] Storage test: total=${allFlavorsTest.length}, salgadas=${salgadasTest.length}`);
+        const schemaCheck = await db.execute(sql`
+          SELECT column_name, data_type
+          FROM information_schema.columns 
+          WHERE table_name = 'pizza_flavors' 
+          ORDER BY ordinal_position
+        `);
+        
+        console.log('🔍 [Health] Schema no Netlify:', JSON.stringify(schemaCheck));
+        
+        // 3. Test storage layer sem schema conflicts
+        let testResults = { totalFlavors: 0, salgadasCount: 0, error: null };
+        try {
+          const salgadasTest = await storage.getFlavorsByCategory('salgadas');
+          const allFlavorsTest = await storage.getAllFlavors();
+          testResults = { totalFlavors: allFlavorsTest.length, salgadasCount: salgadasTest.length, error: null };
+        } catch (storageError) {
+          const errorMsg = storageError instanceof Error ? storageError.message : String(storageError);
+          testResults = { totalFlavors: 0, salgadasCount: 0, error: errorMsg };
+        }
+        
+        console.log(`🔍 [Health] Storage test: ${JSON.stringify(testResults)}`);
         
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
             ...env,
+            netlifySchema: schemaCheck,
             storageTest: {
-              totalFlavors: allFlavorsTest.length,
-              salgadasCount: salgadasTest.length,
-              message: allFlavorsTest.length === 0 ? 'PROBLEMA: Nenhum sabor encontrado!' : 'OK: Sabores encontrados',
-              dbFixed: 'HTTP driver + relaxed available filter applied'
+              ...testResults,
+              message: testResults.error ? `ERRO: ${testResults.error}` : 
+                       testResults.totalFlavors === 0 ? 'PROBLEMA: Nenhum sabor encontrado!' : 
+                       'OK: Sabores encontrados',
+              schemaIssue: !schemaCheck.some(col => col.column_name === 'created_at') ? 'created_at MISSING!' : 'schema OK'
             }
           })
         };
