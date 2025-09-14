@@ -292,9 +292,12 @@ export class DatabaseStorage implements IStorage {
   // Pizza flavors - AGORA usando PostgreSQL real
   async getAllFlavors(): Promise<PizzaFlavor[]> {
     try {
-      return await db.select().from(pizzaFlavors).where(eq(pizzaFlavors.available, true));
+      console.log('🔍 [DatabaseStorage] Getting all flavors...');
+      const result = await db.select().from(pizzaFlavors).where(eq(pizzaFlavors.available, true));
+      console.log(`📊 [DatabaseStorage] Found ${result.length} total flavors`);
+      return result;
     } catch (error) {
-      console.error('Database error:', error);
+      console.error('❌ [DatabaseStorage] Database error:', error);
       // READ-ONLY MODE: Return empty array instead of fallback
       return [];
     }
@@ -302,10 +305,13 @@ export class DatabaseStorage implements IStorage {
 
   async getFlavorsByCategory(category: string): Promise<PizzaFlavor[]> {
     try {
-      return await db.select().from(pizzaFlavors)
+      console.log(`🔍 [DatabaseStorage] Searching category: ${category}`);
+      const result = await db.select().from(pizzaFlavors)
         .where(and(eq(pizzaFlavors.category, category), eq(pizzaFlavors.available, true)));
+      console.log(`📊 [DatabaseStorage] Found ${result.length} flavors for category: ${category}`);
+      return result;
     } catch (error) {
-      console.error('Database error:', error);
+      console.error('❌ [DatabaseStorage] Database error:', error);
       // READ-ONLY MODE: Return empty array instead of fallback
       return [];
     }
