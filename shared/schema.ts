@@ -5,7 +5,7 @@ import { z } from "zod";
 
 export const pizzaFlavors = pgTable("pizza_flavors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(), // UNIQUE constraint to prevent duplicates
   description: text("description").notNull(),
   prices: jsonb("prices").notNull(), // { grande: "35.00", media: "28.00", individual: "18.00" }
   category: text("category").notNull(), // 'salgadas', 'doces', 'entradas', 'bebidas'
@@ -18,7 +18,7 @@ export const pizzaFlavors = pgTable("pizza_flavors", {
 // Extras table
 export const extras = pgTable("extras", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(), // UNIQUE constraint to prevent duplicates
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(), // 'salgadas' or 'doces'
@@ -29,7 +29,7 @@ export const extras = pgTable("extras", {
 // Dough types table
 export const doughTypes = pgTable("dough_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(), // UNIQUE constraint to prevent duplicates
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   category: text("category").notNull(), // 'salgadas' or 'doces'

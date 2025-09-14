@@ -1,4 +1,4 @@
-import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
+import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { DatabaseStorage } from '../../src/storage';
 import { bulkImportFlavorsSchema, bulkImportExtrasSchema, bulkImportDoughTypesSchema } from '../../shared/schema';
 import { AuthService } from '../../src/services/auth-service';
@@ -8,14 +8,19 @@ import { AdminSeeder } from '../../src/services/admin-seeder';
 // Initialize storage
 const storage = new DatabaseStorage();
 
-// 🌱 Initialize admin users on startup
-(async () => {
-  try {
-    await AdminSeeder.createInitialAdmin();
-  } catch (error) {
-    console.warn('⚠️ [SEEDER] Não foi possível criar admins iniciais:', error);
-  }
-})();
+// 🌱 Initialize admin users only if explicitly enabled
+if (process.env.ENABLE_AUTO_SEED === 'true') {
+  (async () => {
+    try {
+      console.log('🌱 [SEEDER] Auto-seed habilitado, criando admins iniciais...');
+      await AdminSeeder.createInitialAdmin();
+    } catch (error) {
+      console.warn('⚠️ [SEEDER] Não foi possível criar admins iniciais:', error);
+    }
+  })();
+} else {
+  console.log('🔒 [READ-ONLY] Auto-seed desabilitado - modo produção somente leitura');
+}
 
 // Função helper para migrar configurações para o banco
 async function migrateSettingsToDatabase() {
@@ -274,99 +279,7 @@ function calculateDeliveryFromCEP(cep: string) {
   };
 }
 
-// Dados de fallback caso banco não funcione
-const FALLBACK_FLAVORS = [
-  { 
-    id: '8', 
-    name: 'Margherita', 
-    category: 'salgadas', 
-    prices: { "grande": "35.00", "individual": "25.00" }, 
-    description: 'Molho de tomate, mussarela de búfala e manjericão fresco',
-    imageUrl: 'https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?w=400',
-    available: true
-  },
-  { 
-    id: '9', 
-    name: 'Calabresa', 
-    category: 'salgadas', 
-    prices: { "grande": "38.00", "individual": "28.00" }, 
-    description: 'Molho de tomate, mussarela e calabresa tradicional',
-    imageUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400',
-    available: true
-  },
-  { 
-    id: '10', 
-    name: 'Pepperoni', 
-    category: 'salgadas', 
-    prices: { "grande": "40.00", "individual": "30.00" }, 
-    description: 'Molho de tomate, mussarela e pepperoni importado',
-    imageUrl: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400',
-    available: true
-  },
-  { 
-    id: '11', 
-    name: 'Quatro Queijos', 
-    category: 'salgadas', 
-    prices: { "grande": "45.00", "individual": "32.00" }, 
-    description: 'Mussarela, provolone, gorgonzola e parmesão',
-    imageUrl: 'https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=400',
-    available: true
-  },
-  { 
-    id: '12', 
-    name: 'Portuguesa', 
-    category: 'salgadas', 
-    prices: { "grande": "48.00", "individual": "35.00" }, 
-    description: 'Presunto, ovos, cebola, azeitona, pimentão e mussarela',
-    imageUrl: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400',
-    available: true
-  },
-  { 
-    id: '13', 
-    name: 'Chocolate', 
-    category: 'doces', 
-    prices: { "media": "25.00", "individual": "18.00" }, 
-    description: 'Chocolate ao leite derretido com morango',
-    imageUrl: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400',
-    available: true
-  },
-  { 
-    id: '14', 
-    name: 'Brigadeiro', 
-    category: 'doces', 
-    prices: { "media": "28.00", "individual": "20.00" }, 
-    description: 'Chocolate, granulado e leite condensado',
-    imageUrl: 'https://images.unsplash.com/photo-1571115764595-644a1f56a55c?w=400',
-    available: true
-  },
-  { 
-    id: '15', 
-    name: 'Pão de Alho', 
-    category: 'entradas', 
-    prices: { "individual": "12.00" }, 
-    description: 'Pão de alho gratinado com queijo',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400',
-    available: true
-  },
-  { 
-    id: '16', 
-    name: 'Coca-Cola 350ml', 
-    category: 'bebidas', 
-    prices: { "individual": "5.00" }, 
-    description: 'Refrigerante gelado',
-    imageUrl: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400',
-    available: true
-  },
-  { 
-    id: '17', 
-    name: 'Água 500ml', 
-    category: 'bebidas', 
-    prices: { "individual": "3.50" }, 
-    description: 'Água mineral gelada',
-    imageUrl: 'https://images.unsplash.com/photo-1550572017-ebe9c04eadc1?w=400',
-    available: true
-  }
-];
+// READ-ONLY MODE: No fallback data - only real database data
 
 // Debug function for logging
 function debugLog(message: string, data?: any) {
@@ -418,7 +331,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
     debugLog(`🔒 CORS Check: ${origin} - ${allowed ? 'ALLOWED' : 'BLOCKED'}`);
   }
 
-  const path = event.path.replace('/.netlify/functions/api', '') || '/';
+  const rawPath = event.path.replace('/.netlify/functions/api', '') || '/';
+  const path = ('/' + rawPath).replace(/\/+/g,'/').replace(/\/$/, '') || '/';
   const method = event.httpMethod;
   
   // Debug log da requisição entrante
@@ -450,6 +364,29 @@ export const handler: Handler = async (event: HandlerEvent) => {
   }
 
   try {
+    // 🔒 READ-ONLY MODE protection for write operations
+    const READ_ONLY_MODE = process.env.READ_ONLY_MODE === 'true';
+    const writeOperations = ['POST', 'PUT', 'DELETE', 'PATCH'];
+    
+    if (READ_ONLY_MODE && writeOperations.includes(method)) {
+      // Only allow admin authentication in read-only mode
+      const allowedWritePaths = ['/admin/auth'];
+      
+      if (!allowedWritePaths.some(allowedPath => path.startsWith(allowedPath))) {
+        debugLog(`🔒 READ-ONLY MODE: Blocked ${method} ${path}`);
+        return {
+          statusCode: 403,
+          headers,
+          body: JSON.stringify({ 
+            error: 'Sistema em modo somente leitura',
+            message: 'Operações de escrita estão temporariamente desabilitadas. Use seeding manual para adicionar dados.',
+            readOnlyMode: true,
+            contactAdmin: 'Entre em contato com o administrador para modificações de dados'
+          })
+        };
+      }
+    }
+
     // Root endpoint
     if (path === '/' && method === 'GET') {
       const response = { 
@@ -489,11 +426,11 @@ export const handler: Handler = async (event: HandlerEvent) => {
         };
       } catch (error) {
         debugLog(`❌ Erro ao buscar sabores do banco:`, error);
-        // Fallback em caso de erro
+        // READ-ONLY MODE: Return empty array instead of mock data
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify(FALLBACK_FLAVORS)
+          body: JSON.stringify([])
         };
       }
     }
@@ -511,13 +448,11 @@ export const handler: Handler = async (event: HandlerEvent) => {
         };
       } catch (error) {
         debugLog(`❌ Erro ao buscar sabores da categoria do banco:`, error);
-        // Fallback em caso de erro
-        const category = path.split('/')[2];
-        const categoryFlavors = FALLBACK_FLAVORS.filter(f => f.category === category);
+        // READ-ONLY MODE: Return empty array instead of mock data
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify(categoryFlavors)
+          body: JSON.stringify([])
         };
       }
     }
@@ -526,41 +461,19 @@ export const handler: Handler = async (event: HandlerEvent) => {
     if (path === '/extras' && method === 'GET') {
       try {
         const extras = await storage.getAllExtras();
-        // Se não tiver dados no banco, usar fallback
-        if (!extras || extras.length === 0) {
-          const fallbackExtras = [
-            { id: '1', name: 'Calabresa', price: 3.50, category: 'salgada' },
-            { id: '2', name: 'Bacon', price: 4.00, category: 'salgada' },
-            { id: '3', name: 'Cogumelos', price: 3.00, category: 'salgada' },
-            { id: '4', name: 'Azeitona', price: 2.50, category: 'salgada' },
-            { id: '5', name: 'Chocolate Granulado', price: 2.00, category: 'doce' },
-            { id: '6', name: 'Leite Condensado', price: 3.00, category: 'doce' }
-          ];
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify(fallbackExtras)
-          };
-        }
+        // READ-ONLY MODE: Return actual data or empty array, no fallbacks
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify(extras)
+          body: JSON.stringify(extras || [])
         };
       } catch (error) {
-        // Fallback em caso de erro
-        const fallbackExtras = [
-          { id: '1', name: 'Calabresa', price: 3.50, category: 'salgada' },
-          { id: '2', name: 'Bacon', price: 4.00, category: 'salgada' },
-          { id: '3', name: 'Cogumelos', price: 3.00, category: 'salgada' },
-          { id: '4', name: 'Azeitona', price: 2.50, category: 'salgada' },
-          { id: '5', name: 'Chocolate Granulado', price: 2.00, category: 'doce' },
-          { id: '6', name: 'Leite Condensado', price: 3.00, category: 'doce' }
-        ];
+        debugLog(`❌ Erro ao buscar extras do banco:`, error);
+        // READ-ONLY MODE: Return empty array instead of mock data
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify(fallbackExtras)
+          body: JSON.stringify([])
         };
       }
     }
@@ -569,39 +482,19 @@ export const handler: Handler = async (event: HandlerEvent) => {
     if (path === '/dough-types' && method === 'GET') {
       try {
         const doughTypes = await storage.getAllDoughTypes();
-        // Se não tiver dados no banco, usar fallback
-        if (!doughTypes || doughTypes.length === 0) {
-          const fallbackDough = [
-            { id: '1', name: 'Massa Tradicional', price: 0.00, category: 'salgada' },
-            { id: '2', name: 'Massa Integral', price: 2.00, category: 'salgada' },
-            { id: '3', name: 'Borda Recheada', price: 5.00, category: 'salgada' },
-            { id: '4', name: 'Massa Doce', price: 0.00, category: 'doce' },
-            { id: '5', name: 'Massa Chocolate', price: 3.00, category: 'doce' }
-          ];
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify(fallbackDough)
-          };
-        }
+        // READ-ONLY MODE: Return actual data or empty array, no fallbacks
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify(doughTypes)
+          body: JSON.stringify(doughTypes || [])
         };
       } catch (error) {
-        // Fallback em caso de erro
-        const fallbackDough = [
-          { id: '1', name: 'Massa Tradicional', price: 0.00, category: 'salgada' },
-          { id: '2', name: 'Massa Integral', price: 2.00, category: 'salgada' },
-          { id: '3', name: 'Borda Recheada', price: 5.00, category: 'salgada' },
-          { id: '4', name: 'Massa Doce', price: 0.00, category: 'doce' },
-          { id: '5', name: 'Massa Chocolate', price: 3.00, category: 'doce' }
-        ];
+        debugLog(`❌ Erro ao buscar tipos de massa do banco:`, error);
+        // READ-ONLY MODE: Return empty array instead of mock data
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify(fallbackDough)
+          body: JSON.stringify([])
         };
       }
     }
@@ -852,7 +745,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
     }
 
     // 🔍 SECURE Admin profile check via cookies
-    if (path === '/admin/me' && method === 'GET') {
+    if ((path === '/admin/me' || path.startsWith('/admin/me')) && method === 'GET') {
       try {
         // Extrair access token dos cookies
         const cookies = event.headers.cookie || '';
@@ -1010,11 +903,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
           body: JSON.stringify(flavors)
         };
       } catch (error) {
-        // Fallback em caso de erro
+        // READ-ONLY MODE: Return empty array instead of fallback
+        debugLog(`❌ Erro ao buscar sabores admin:`, error);
         return {
           statusCode: 200,
           headers,
-          body: JSON.stringify(FALLBACK_FLAVORS)
+          body: JSON.stringify([])
         };
       }
     }
@@ -1098,8 +992,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
         
         const results = {
           success: 0,
-          errors: [],
-          imported: []
+          errors: [] as string[],
+          imported: [] as {name: string, id: string}[]
         };
         
         // Importar cada sabor
@@ -1113,7 +1007,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
             });
             debugLog(`✅ Sabor importado: ${createdFlavor.name}`);
           } catch (error) {
-            const errorMsg = `Erro no sabor ${index + 1} (${flavor.name}): ${error.message}`;
+            const errorMsg = `Erro no sabor ${index + 1} (${flavor.name}): ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
             results.errors.push(errorMsg);
             debugLog(`❌ ${errorMsg}`);
           }
@@ -1137,7 +1031,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
           headers,
           body: JSON.stringify({ 
             error: 'Dados inválidos', 
-            details: error.message 
+            details: error instanceof Error ? error.message : 'Erro desconhecido'
           })
         };
       }
@@ -1162,8 +1056,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
         
         const results = {
           success: 0,
-          errors: [],
-          imported: []
+          errors: [] as string[],
+          imported: [] as {name: string, id: string}[]
         };
         
         for (const [index, extra] of validatedData.extras.entries()) {
@@ -1176,7 +1070,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
             });
             debugLog(`✅ Extra importado: ${createdExtra.name}`);
           } catch (error) {
-            const errorMsg = `Erro no extra ${index + 1} (${extra.name}): ${error.message}`;
+            const errorMsg = `Erro no extra ${index + 1} (${extra.name}): ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
             results.errors.push(errorMsg);
             debugLog(`❌ ${errorMsg}`);
           }
@@ -1200,7 +1094,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
           headers,
           body: JSON.stringify({ 
             error: 'Dados inválidos', 
-            details: error.message 
+            details: error instanceof Error ? error.message : 'Erro desconhecido'
           })
         };
       }
@@ -1225,8 +1119,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
         
         const results = {
           success: 0,
-          errors: [],
-          imported: []
+          errors: [] as string[],
+          imported: [] as {name: string, id: string}[]
         };
         
         for (const [index, doughType] of validatedData.doughTypes.entries()) {
@@ -1239,7 +1133,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
             });
             debugLog(`✅ Tipo de massa importado: ${createdDoughType.name}`);
           } catch (error) {
-            const errorMsg = `Erro no tipo de massa ${index + 1} (${doughType.name}): ${error.message}`;
+            const errorMsg = `Erro no tipo de massa ${index + 1} (${doughType.name}): ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
             results.errors.push(errorMsg);
             debugLog(`❌ ${errorMsg}`);
           }
@@ -1263,7 +1157,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
           headers,
           body: JSON.stringify({ 
             error: 'Dados inválidos', 
-            details: error.message 
+            details: error instanceof Error ? error.message : 'Erro desconhecido'
           })
         };
       }
@@ -1296,7 +1190,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         }
         
         // Reconstruir objeto de configurações a partir do banco
-        const settingsObject = {};
+        const settingsObject: Record<string, any> = {};
         settings.forEach(setting => {
           settingsObject[setting.section] = setting.data;
         });
@@ -1335,7 +1229,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
           const newSettings = await storage.getAllSettings();
           
           // Reconstruir objeto de configurações a partir do banco
-          const settingsObject = {};
+          const settingsObject: Record<string, any> = {};
           newSettings.forEach(setting => {
             settingsObject[setting.section] = setting.data;
           });
@@ -1348,7 +1242,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         }
         
         // Reconstruir objeto de configurações a partir do banco
-        const settingsObject = {};
+        const settingsObject: Record<string, any> = {};
         settings.forEach(setting => {
           settingsObject[setting.section] = setting.data;
         });
@@ -1453,7 +1347,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
           headers,
           body: JSON.stringify({ 
             error: 'Erro interno do servidor',
-            message: error.message
+            message: error instanceof Error ? error.message : 'Erro desconhecido'
           })
         };
       }
@@ -1683,21 +1577,14 @@ export const handler: Handler = async (event: HandlerEvent) => {
           ]
         };
       } catch (error) {
-        // Fallback em caso de erro
+        // READ-ONLY MODE: Return minimal dashboard data when database fails
+        debugLog(`❌ Erro ao buscar dados dashboard:`, error);
         dashboardData = {
-          todayOrders: 15,
-          monthlyRevenue: 4250.00,
-          totalProducts: FALLBACK_FLAVORS.length,
-          popularFlavors: [
-            { name: 'Margherita', orders: 45 },
-            { name: 'Pepperoni', orders: 38 },
-            { name: 'Calabresa', orders: 32 }
-          ],
-          recentOrders: [
-            { id: '1', customer: 'João Silva', total: 'R$ 35,00', status: 'preparing' },
-            { id: '2', customer: 'Maria Santos', total: 'R$ 42,00', status: 'delivered' },
-            { id: '3', customer: 'Pedro Lima', total: 'R$ 28,00', status: 'confirmed' }
-          ]
+          todayOrders: 0,
+          monthlyRevenue: 0,
+          totalProducts: 0,
+          popularFlavors: [],
+          recentOrders: []
         };
       }
 

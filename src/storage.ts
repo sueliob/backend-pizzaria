@@ -92,6 +92,8 @@ export class MemStorage implements IStorage {
         category: "salgadas",
         imageUrl: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400",
         available: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
       {
         name: "Pepperoni",
@@ -100,6 +102,8 @@ export class MemStorage implements IStorage {
         category: "salgadas",
         imageUrl: "https://images.unsplash.com/photo-1628840042765-356cda07504e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400",
         available: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
       {
         name: "Chocolate com Morango",
@@ -108,6 +112,8 @@ export class MemStorage implements IStorage {
         category: "doces",
         imageUrl: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400",
         available: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
     ];
 
@@ -145,7 +151,14 @@ export class MemStorage implements IStorage {
   async createFlavor(flavor: InsertPizzaFlavor): Promise<PizzaFlavor> {
     this.ensureInitialized();
     const id = randomUUID();
-    const newFlavor = { id, ...flavor };
+    const newFlavor = { 
+      id, 
+      ...flavor, 
+      createdAt: new Date(), 
+      updatedAt: new Date(),
+      available: flavor.available ?? true,
+      imageUrl: flavor.imageUrl ?? null
+    };
     this.flavors.set(id, newFlavor);
     return newFlavor;
   }
@@ -158,7 +171,15 @@ export class MemStorage implements IStorage {
   async createOrder(order: InsertOrder): Promise<Order> {
     this.ensureInitialized();
     const id = randomUUID();
-    const newOrder = { id, ...order };
+    const newOrder = { 
+      id, 
+      ...order, 
+      createdAt: new Date().toISOString(),
+      status: order.status ?? 'pending',
+      address: order.address ?? null,
+      deliveryFee: order.deliveryFee ?? '0',
+      notes: order.notes ?? null
+    };
     this.orders.set(id, newOrder);
     return newOrder;
   }
@@ -205,7 +226,14 @@ export class MemStorage implements IStorage {
   async getExtrasByCategory(): Promise<Extra[]> { return []; }
   async getExtra(): Promise<Extra | undefined> { return undefined; }
   async createExtra(extra: InsertExtra): Promise<Extra> {
-    return { id: randomUUID(), ...extra, available: true, createdAt: new Date() };
+    return { 
+      id: randomUUID(), 
+      ...extra, 
+      available: true, 
+      createdAt: new Date(),
+      description: extra.description ?? null,
+      price: extra.price.toString()
+    };
   }
   async updateExtra(): Promise<Extra | undefined> { return undefined; }
   async deleteExtra(): Promise<boolean> { return true; }
@@ -214,10 +242,49 @@ export class MemStorage implements IStorage {
   async getDoughTypesByCategory(): Promise<DoughType[]> { return []; }
   async getDoughType(): Promise<DoughType | undefined> { return undefined; }
   async createDoughType(doughType: InsertDoughType): Promise<DoughType> {
-    return { id: randomUUID(), ...doughType, available: true, createdAt: new Date() };
+    return { 
+      id: randomUUID(), 
+      ...doughType, 
+      available: true, 
+      createdAt: new Date(),
+      description: doughType.description ?? null,
+      price: doughType.price.toString()
+    };
   }
   async updateDoughType(): Promise<DoughType | undefined> { return undefined; }
   async deleteDoughType(): Promise<boolean> { return true; }
+
+  // Admin Users - Mock implementations
+  async getAllAdminUsers(): Promise<AdminUser[]> { return []; }
+  async getAdminUser(id: string): Promise<AdminUser | undefined> { return undefined; }
+  async getAdminUserByUsername(username: string): Promise<AdminUser | undefined> { return undefined; }
+  async getAdminUserByEmail(email: string): Promise<AdminUser | undefined> { return undefined; }
+  async createAdminUser(user: InsertAdminUser): Promise<AdminUser> {
+    return {
+      id: randomUUID(),
+      ...user,
+      role: user.role ?? 'admin',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isActive: user.isActive ?? true,
+      lastLogin: null
+    };
+  }
+  async updateAdminUser(id: string, updates: Partial<AdminUser>): Promise<AdminUser | undefined> { return undefined; }
+  async deleteAdminUser(id: string): Promise<boolean> { return false; }
+
+  // CEP Cache - Mock implementations
+  async getCepFromCache(cep: string): Promise<CepCache | undefined> { return undefined; }
+  async setCepCache(cepData: InsertCepCache): Promise<CepCache> {
+    return {
+      id: randomUUID(),
+      ...cepData,
+      address: cepData.address ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
+  async updateCepCache(cep: string, updates: Partial<CepCache>): Promise<CepCache | undefined> { return undefined; }
 }
 
 // DatabaseStorage class with real database operations
@@ -227,10 +294,9 @@ export class DatabaseStorage implements IStorage {
     try {
       return await db.select().from(pizzaFlavors).where(eq(pizzaFlavors.available, true));
     } catch (error) {
-      console.error('Database error, using fallback:', error);
-      // Fallback para MemStorage em caso de erro
-      const memStorage = new MemStorage();
-      return memStorage.getAllFlavors();
+      console.error('Database error:', error);
+      // READ-ONLY MODE: Return empty array instead of fallback
+      return [];
     }
   }
 
@@ -239,9 +305,9 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(pizzaFlavors)
         .where(and(eq(pizzaFlavors.category, category), eq(pizzaFlavors.available, true)));
     } catch (error) {
-      console.error('Database error, using fallback:', error);
-      const memStorage = new MemStorage();
-      return memStorage.getFlavorsByCategory(category);
+      console.error('Database error:', error);
+      // READ-ONLY MODE: Return empty array instead of fallback
+      return [];
     }
   }
 
@@ -250,9 +316,9 @@ export class DatabaseStorage implements IStorage {
       const [flavor] = await db.select().from(pizzaFlavors).where(eq(pizzaFlavors.id, id));
       return flavor;
     } catch (error) {
-      console.error('Database error, using fallback:', error);
-      const memStorage = new MemStorage();
-      return memStorage.getFlavor(id);
+      console.error('Database error:', error);
+      // READ-ONLY MODE: Return undefined instead of fallback
+      return undefined;
     }
   }
 
@@ -322,7 +388,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteExtra(id: string): Promise<boolean> {
     const result = await db.delete(extras).where(eq(extras.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Dough types - Real database operations
@@ -351,7 +417,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDoughType(id: string): Promise<boolean> {
     const result = await db.delete(doughTypes).where(eq(doughTypes.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Orders - keep using MemStorage for compatibility
@@ -513,7 +579,7 @@ export class DatabaseStorage implements IStorage {
   async deleteAdminUser(id: string): Promise<boolean> {
     try {
       const result = await db.delete(adminUsers).where(eq(adminUsers.id, id));
-      return result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     } catch (error) {
       console.error('Database error deleting admin user:', error);
       return false;

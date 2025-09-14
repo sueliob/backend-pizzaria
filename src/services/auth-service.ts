@@ -76,7 +76,7 @@ export class AuthService {
       const decoded = jwt.verify(token, this.ACCESS_TOKEN_SECRET) as TokenPayload;
       return decoded;
     } catch (error) {
-      console.error('❌ [AUTH] Invalid access token:', error.message);
+      console.error('❌ [AUTH] Invalid access token:', error instanceof Error ? error.message : 'Erro desconhecido');
       return null;
     }
   }
@@ -95,7 +95,7 @@ export class AuthService {
       const decoded = jwt.verify(token, this.REFRESH_TOKEN_SECRET) as any;
       return { userId: decoded.userId };
     } catch (error) {
-      console.error('❌ [AUTH] Invalid refresh token:', error.message);
+      console.error('❌ [AUTH] Invalid refresh token:', error instanceof Error ? error.message : 'Erro desconhecido');
       return null;
     }
   }
