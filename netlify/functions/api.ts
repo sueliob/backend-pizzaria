@@ -402,16 +402,53 @@ export const handler: Handler = async (event: HandlerEvent) => {
       };
     }
 
-    // Health check
+    // 🔍 DIAGNÓSTICO: Health check detalhado (conforme análise)
     if (path === '/health' && method === 'GET') {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ 
-          status: 'ok', 
-          timestamp: new Date().toISOString() 
-        })
-      };
+      try {
+        console.log('🔍 [Health] Running detailed health check...');
+        
+        // 1. Environment info
+        const env = {
+          status: "ok",
+          timestamp: new Date().toISOString(),
+          environment: process.env.NODE_ENV || 'development',
+          hasDatabase: !!process.env.DATABASE_URL,
+          databaseHost: process.env.DATABASE_URL ? 
+            process.env.DATABASE_URL.split('@')[1]?.split('/')[0] || 'unknown' : 'none'
+        };
+        
+        // 2. Test storage layer (main test)
+        const salgadasTest = await storage.getFlavorsByCategory('salgadas');
+        const allFlavorsTest = await storage.getAllFlavors();
+        
+        console.log(`🔍 [Health] Storage test results: total=${allFlavorsTest.length}, salgadas=${salgadasTest.length}`);
+        
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            ...env,
+            storageTest: {
+              totalFlavors: allFlavorsTest.length,
+              salgadasCount: salgadasTest.length,
+              message: allFlavorsTest.length === 0 ? 'PROBLEMA: Nenhum sabor encontrado!' : 'OK: Sabores encontrados'
+            }
+          })
+        };
+        
+      } catch (error) {
+        console.error('❌ [Health] Health check failed:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            status: "error",
+            error: errorMessage,
+            timestamp: new Date().toISOString()
+          })
+        };
+      }
     }
 
     // Get all flavors
