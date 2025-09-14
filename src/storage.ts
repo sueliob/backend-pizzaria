@@ -293,27 +293,40 @@ export class DatabaseStorage implements IStorage {
   async getAllFlavors(): Promise<PizzaFlavor[]> {
     try {
       console.log('🔍 [DatabaseStorage] Getting all flavors...');
-      const result = await db.select().from(pizzaFlavors).where(eq(pizzaFlavors.available, true));
-      console.log(`📊 [DatabaseStorage] Found ${result.length} total flavors`);
-      return result;
+      // DIAGNÓSTICO: Relaxar filtro available para encontrar dados
+      const result = await db.select().from(pizzaFlavors);
+      console.log(`📊 [DatabaseStorage] Found ${result.length} total flavors (no available filter)`);
+      
+      // Mostrar breakdown
+      const available = result.filter(f => f.available === true);
+      const unavailable = result.filter(f => f.available === false);
+      const nullAvailable = result.filter(f => f.available === null);
+      
+      console.log(`📊 [DatabaseStorage] Breakdown: available=${available.length}, unavailable=${unavailable.length}, null=${nullAvailable.length}`);
+      
+      // Retornar todos por enquanto para diagnóstico
+      return result.filter(f => f.available !== false); // Include true and null
     } catch (error) {
       console.error('❌ [DatabaseStorage] Database error:', error);
-      // READ-ONLY MODE: Return empty array instead of fallback
-      return [];
+      // DIAGNÓSTICO: Não esconder erro mais
+      throw error;
     }
   }
 
   async getFlavorsByCategory(category: string): Promise<PizzaFlavor[]> {
     try {
       console.log(`🔍 [DatabaseStorage] Searching category: ${category}`);
+      // DIAGNÓSTICO: Relaxar filtro available
       const result = await db.select().from(pizzaFlavors)
-        .where(and(eq(pizzaFlavors.category, category), eq(pizzaFlavors.available, true)));
-      console.log(`📊 [DatabaseStorage] Found ${result.length} flavors for category: ${category}`);
-      return result;
+        .where(eq(pizzaFlavors.category, category));
+      console.log(`📊 [DatabaseStorage] Found ${result.length} flavors for category: ${category} (no available filter)`);
+      
+      // Retornar apenas não-false por enquanto
+      return result.filter(f => f.available !== false);
     } catch (error) {
       console.error('❌ [DatabaseStorage] Database error:', error);
-      // READ-ONLY MODE: Return empty array instead of fallback
-      return [];
+      // DIAGNÓSTICO: Não esconder erro mais
+      throw error;
     }
   }
 

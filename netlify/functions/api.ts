@@ -421,7 +421,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         const salgadasTest = await storage.getFlavorsByCategory('salgadas');
         const allFlavorsTest = await storage.getAllFlavors();
         
-        console.log(`🔍 [Health] Storage test results: total=${allFlavorsTest.length}, salgadas=${salgadasTest.length}`);
+        console.log(`🔍 [Health] Storage test: total=${allFlavorsTest.length}, salgadas=${salgadasTest.length}`);
         
         return {
           statusCode: 200,
@@ -431,7 +431,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
             storageTest: {
               totalFlavors: allFlavorsTest.length,
               salgadasCount: salgadasTest.length,
-              message: allFlavorsTest.length === 0 ? 'PROBLEMA: Nenhum sabor encontrado!' : 'OK: Sabores encontrados'
+              message: allFlavorsTest.length === 0 ? 'PROBLEMA: Nenhum sabor encontrado!' : 'OK: Sabores encontrados',
+              dbFixed: 'HTTP driver + relaxed available filter applied'
             }
           })
         };
