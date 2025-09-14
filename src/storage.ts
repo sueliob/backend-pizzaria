@@ -425,6 +425,136 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
   }
+
+  // 🔐 Admin Users - Database operations for authentication
+  async getAllAdminUsers(): Promise<AdminUser[]> {
+    try {
+      return await db.select().from(adminUsers);
+    } catch (error) {
+      console.error('Database error getting admin users:', error);
+      return [];
+    }
+  }
+
+  async getAdminUser(id: string): Promise<AdminUser | undefined> {
+    try {
+      const [user] = await db.select().from(adminUsers).where(eq(adminUsers.id, id));
+      return user || undefined;
+    } catch (error) {
+      console.error('Database error getting admin user by id:', error);
+      return undefined;
+    }
+  }
+
+  async getAdminUserByUsername(username: string): Promise<AdminUser | undefined> {
+    try {
+      const [user] = await db.select().from(adminUsers).where(eq(adminUsers.username, username));
+      return user || undefined;
+    } catch (error) {
+      console.error('Database error getting admin user by username:', error);
+      return undefined;
+    }
+  }
+
+  // Alias para compatibilidade com AuthService
+  async getAdminByUsername(username: string): Promise<AdminUser | undefined> {
+    return this.getAdminUserByUsername(username);
+  }
+
+  async getAdminUserByEmail(email: string): Promise<AdminUser | undefined> {
+    try {
+      const [user] = await db.select().from(adminUsers).where(eq(adminUsers.email, email));
+      return user || undefined;
+    } catch (error) {
+      console.error('Database error getting admin user by email:', error);
+      return undefined;
+    }
+  }
+
+  async createAdminUser(user: InsertAdminUser): Promise<AdminUser> {
+    try {
+      const [newUser] = await db.insert(adminUsers)
+        .values({ ...user, id: randomUUID() })
+        .returning();
+      return newUser;
+    } catch (error) {
+      console.error('Database error creating admin user:', error);
+      throw error;
+    }
+  }
+
+  async updateAdminUser(id: string, updates: Partial<AdminUser>): Promise<AdminUser | undefined> {
+    try {
+      const [updatedUser] = await db.update(adminUsers)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(adminUsers.id, id))
+        .returning();
+      return updatedUser;
+    } catch (error) {
+      console.error('Database error updating admin user:', error);
+      return undefined;
+    }
+  }
+
+  // Método específico para atualizar último login
+  async updateAdminLastLogin(id: string): Promise<AdminUser | undefined> {
+    try {
+      const [updatedUser] = await db.update(adminUsers)
+        .set({ lastLogin: new Date(), updatedAt: new Date() })
+        .where(eq(adminUsers.id, id))
+        .returning();
+      return updatedUser;
+    } catch (error) {
+      console.error('Database error updating admin last login:', error);
+      return undefined;
+    }
+  }
+
+  async deleteAdminUser(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(adminUsers).where(eq(adminUsers.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Database error deleting admin user:', error);
+      return false;
+    }
+  }
+
+  // 🗺️ CEP Cache - Database operations for delivery optimization
+  async getCepFromCache(cep: string): Promise<CepCache | undefined> {
+    try {
+      const [cached] = await db.select().from(cepCache).where(eq(cepCache.cep, cep));
+      return cached || undefined;
+    } catch (error) {
+      console.error('Database error getting CEP from cache:', error);
+      return undefined;
+    }
+  }
+
+  async setCepCache(cepData: InsertCepCache): Promise<CepCache> {
+    try {
+      const [newCache] = await db.insert(cepCache)
+        .values({ ...cepData, id: randomUUID() })
+        .returning();
+      return newCache;
+    } catch (error) {
+      console.error('Database error setting CEP cache:', error);
+      throw error;
+    }
+  }
+
+  async updateCepCache(cep: string, updates: Partial<CepCache>): Promise<CepCache | undefined> {
+    try {
+      const [updated] = await db.update(cepCache)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(cepCache.cep, cep))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error('Database error updating CEP cache:', error);
+      return undefined;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

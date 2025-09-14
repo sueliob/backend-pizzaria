@@ -1,9 +1,21 @@
 import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 import { DatabaseStorage } from '../../src/storage';
 import { bulkImportFlavorsSchema, bulkImportExtrasSchema, bulkImportDoughTypesSchema } from '../../shared/schema';
+import { AuthService } from '../../src/services/auth-service';
+import { RateLimiter } from '../../src/services/rate-limiter';
+import { AdminSeeder } from '../../src/services/admin-seeder';
 
 // Initialize storage
 const storage = new DatabaseStorage();
+
+// 🌱 Initialize admin users on startup
+(async () => {
+  try {
+    await AdminSeeder.createInitialAdmin();
+  } catch (error) {
+    console.warn('⚠️ [SEEDER] Não foi possível criar admins iniciais:', error);
+  }
+})();
 
 // Função helper para migrar configurações para o banco
 async function migrateSettingsToDatabase() {
@@ -713,48 +725,280 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // ========== ADMIN ENDPOINTS ==========
 
-    // Admin login
+    // 🔐 SECURE Admin login with JWT + HttpOnly Cookies + Rate Limiting
     if (path === '/admin/login' && method === 'POST') {
-      const { username, password } = JSON.parse(event.body || '{}');
-      
-      // Simple authentication (in production, use proper password hashing)
-      const validCredentials = [
-        { username: 'admin', password: 'pizzaria123' },
-        { username: 'manager', password: 'manager123' }
-      ];
-      
-      const user = validCredentials.find(u => u.username === username && u.password === password);
-      
-      if (user) {
-        // Generate simple token (in production, use JWT)
-        const token = `admin_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      // Rate limiting: 5 tentativas por IP a cada 15 minutos
+      const rateLimitCheck = RateLimiter.middleware(RateLimiter.CONFIGS.LOGIN)(event);
+      if (!rateLimitCheck.allowed) {
+        return {
+          statusCode: 429,
+          headers: {
+            ...headers,
+            'Retry-After': rateLimitCheck.error!.retryAfter.toString()
+          },
+          body: JSON.stringify({
+            success: false,
+            message: rateLimitCheck.error!.message,
+            retryAfter: rateLimitCheck.error!.retryAfter
+          })
+        };
+      }
+
+      try {
+        const { username, password } = JSON.parse(event.body || '{}');
         
+        if (!username || !password) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Username e password são obrigatórios' })
+          };
+        }
+
+        // Buscar usuário no banco de dados
+        const user = await storage.getAdminByUsername(username);
+        if (!user || !user.isActive) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Credenciais inválidas' })
+          };
+        }
+
+        // Verificar senha com bcrypt
+        const isValidPassword = await AuthService.verifyPassword(password, user.passwordHash);
+        if (!isValidPassword) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Credenciais inválidas' })
+          };
+        }
+
+        // Atualizar último login
+        await storage.updateAdminLastLogin(user.id);
+
+        // Gerar tokens JWT seguros
+        const tokens = AuthService.generateTokens(user);
+        const secureCookies = AuthService.generateSecureCookies(tokens);
+
+        console.log(`✅ [AUTH] Login successful: ${user.username} (${user.role})`);
+
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Set-Cookie': secureCookies.join(', ')
+          },
+          body: JSON.stringify({
+            success: true,
+            message: 'Login realizado com sucesso',
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              role: user.role
+            }
+            // ⚠️ NÃO retornar tokens no body (só em cookies HttpOnly)
+          })
+        };
+
+      } catch (error) {
+        console.error('❌ [AUTH] Login error:', error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ success: false, message: 'Erro interno do servidor' })
+        };
+      }
+    }
+
+    // 🔐 SECURE Admin logout with token revocation
+    if (path === '/admin/logout' && method === 'POST') {
+      try {
+        // Extrair refresh token dos cookies
+        const cookies = event.headers.cookie || '';
+        const refreshTokenMatch = cookies.match(/refresh_token=([^;]+)/);
+        const refreshToken = refreshTokenMatch ? refreshTokenMatch[1] : null;
+
+        if (refreshToken) {
+          // Invalidar refresh token
+          AuthService.revokeRefreshToken(refreshToken);
+          console.log('✅ [AUTH] Logout - refresh token revoked');
+        }
+
+        // Limpar cookies
+        const logoutCookies = AuthService.generateLogoutCookies();
+
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Set-Cookie': logoutCookies.join(', ')
+          },
+          body: JSON.stringify({
+            success: true,
+            message: 'Logout realizado com sucesso'
+          })
+        };
+      } catch (error) {
+        console.error('❌ [AUTH] Logout error:', error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ success: false, message: 'Erro interno' })
+        };
+      }
+    }
+
+    // 🔍 SECURE Admin profile check via cookies
+    if (path === '/admin/me' && method === 'GET') {
+      try {
+        // Extrair access token dos cookies
+        const cookies = event.headers.cookie || '';
+        const accessTokenMatch = cookies.match(/access_token=([^;]+)/);
+        const accessToken = accessTokenMatch ? accessTokenMatch[1] : null;
+
+        if (!accessToken) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Token de acesso não encontrado' })
+          };
+        }
+
+        // Verificar access token
+        const payload = AuthService.verifyAccessToken(accessToken);
+        if (!payload) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Token de acesso inválido' })
+          };
+        }
+
+        // Buscar dados atualizados do usuário
+        const user = await storage.getAdminUser(payload.userId);
+        if (!user || !user.isActive) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Usuário não encontrado ou inativo' })
+          };
+        }
+
+        console.log(`✅ [AUTH] Profile check for: ${user.username}`);
+
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
             success: true,
-            token,
-            user: { username: user.username, role: 'admin' }
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              role: user.role,
+              lastLogin: user.lastLogin
+            }
           })
         };
-      } else {
+      } catch (error) {
+        console.error('❌ [AUTH] Profile check error:', error);
         return {
-          statusCode: 401,
+          statusCode: 500,
           headers,
-          body: JSON.stringify({ success: false, message: 'Credenciais inválidas' })
+          body: JSON.stringify({ success: false, message: 'Erro interno' })
         };
       }
     }
 
-    // Admin - Get all flavors
+    // 🔄 SECURE Token refresh with rotation
+    if (path === '/admin/refresh' && method === 'POST') {
+      try {
+        // Extrair refresh token dos cookies
+        const cookies = event.headers.cookie || '';
+        const refreshTokenMatch = cookies.match(/refresh_token=([^;]+)/);
+        const refreshToken = refreshTokenMatch ? refreshTokenMatch[1] : null;
+
+        if (!refreshToken) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Refresh token não encontrado' })
+          };
+        }
+
+        // Verificar refresh token
+        const decoded = AuthService.verifyRefreshToken(refreshToken);
+        if (!decoded) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Refresh token inválido' })
+          };
+        }
+
+        // Buscar usuário
+        const user = await storage.getAdminUser(decoded.userId);
+        if (!user || !user.isActive) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Usuário inválido' })
+          };
+        }
+
+        // Rotacionar tokens (gerar novos e invalidar antigos)
+        const newTokens = AuthService.rotateRefreshToken(refreshToken, user);
+        if (!newTokens) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Falha na rotação do token' })
+          };
+        }
+
+        const secureCookies = AuthService.generateSecureCookies(newTokens);
+
+        console.log('🔄 [AUTH] Tokens rotacionados para:', user.username);
+
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Set-Cookie': secureCookies.join(', ')
+          },
+          body: JSON.stringify({
+            success: true,
+            message: 'Token renovado com sucesso',
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              role: user.role
+            }
+          })
+        };
+      } catch (error) {
+        console.error('❌ [AUTH] Refresh error:', error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ success: false, message: 'Erro interno' })
+        };
+      }
+    }
+
+    // 🔒 Admin - Get all flavors with JWT authentication
     if (path === '/admin/flavors' && method === 'GET') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      // Usar novo sistema de autenticação JWT
+      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token JWT inválido ou ausente' })
         };
       }
 
@@ -775,14 +1019,14 @@ export const handler: Handler = async (event: HandlerEvent) => {
       }
     }
 
-    // Admin - Create flavor
+    // 🔒 Admin - Create flavor with JWT authentication  
     if (path === '/admin/flavors' && method === 'POST') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token JWT inválido ou ausente' })
         };
       }
 
