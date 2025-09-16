@@ -290,6 +290,40 @@ function getCorsHeaders(origin: string | undefined) {
   };
 }
 
+// 🔧 Helper para verificar autenticação via cookies HttpOnly (padronização)
+async function authenticateAdminViaCookies(cookies: string): Promise<{ userId: string; username: string; role: string } | null> {
+  try {
+    // Extrair access token dos cookies
+    const accessTokenMatch = cookies.match(/access_token=([^;]+)/);
+    const accessToken = accessTokenMatch ? accessTokenMatch[1] : null;
+    
+    if (!accessToken) {
+      return null;
+    }
+    
+    // Verificar access token
+    const payload = AuthService.verifyAccessToken(accessToken);
+    if (!payload) {
+      return null;
+    }
+    
+    // Buscar dados atualizados do usuário
+    const user = await storage.getAdminUser(payload.userId);
+    if (!user || !user.isActive) {
+      return null;
+    }
+    
+    return {
+      userId: user.id,
+      username: user.username,
+      role: user.role
+    };
+  } catch (error) {
+    console.error('❌ [AUTH] Cookie authentication error:', error);
+    return null;
+  }
+}
+
 export const handler: Handler = async (event: HandlerEvent) => {
   const startTime = Date.now();
   
@@ -340,8 +374,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
     const writeOperations = ['POST', 'PUT', 'DELETE', 'PATCH'];
     
     if (READ_ONLY_MODE && writeOperations.includes(method)) {
-      // Only allow admin authentication in read-only mode
-      const allowedWritePaths = ['/admin/auth'];
+      // Allow admin authentication in read-only mode
+      const allowedWritePaths = ['/admin/auth', '/admin/login', '/admin/logout', '/admin/refresh'];
       
       if (!allowedWritePaths.some(allowedPath => path.startsWith(allowedPath))) {
         debugLog(`🔒 READ-ONLY MODE: Blocked ${method} ${path}`);
@@ -710,9 +744,9 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
         return {
           statusCode: 200,
-          headers: {
-            ...headers,
-            'Set-Cookie': secureCookies.join(', ')
+          headers,
+          multiValueHeaders: {
+            'Set-Cookie': secureCookies
           },
           body: JSON.stringify({
             success: true,
@@ -756,9 +790,9 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
         return {
           statusCode: 200,
-          headers: {
-            ...headers,
-            'Set-Cookie': logoutCookies.join(', ')
+          headers,
+          multiValueHeaders: {
+            'Set-Cookie': logoutCookies
           },
           body: JSON.stringify({
             success: true,
@@ -889,9 +923,9 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
         return {
           statusCode: 200,
-          headers: {
-            ...headers,
-            'Set-Cookie': secureCookies.join(', ')
+          headers,
+          multiValueHeaders: {
+            'Set-Cookie': secureCookies
           },
           body: JSON.stringify({
             success: true,
@@ -916,13 +950,14 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // 🔒 Admin - Get all flavors with JWT authentication
     if (path === '/admin/flavors' && method === 'GET') {
-      // Usar novo sistema de autenticação JWT
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      // Usar sistema de autenticação por cookies HttpOnly
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token JWT inválido ou ausente' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -976,12 +1011,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Delete flavor
     if (path.startsWith('/admin/flavors/') && method === 'DELETE') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1005,12 +1041,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import flavors (NEW ENDPOINT)
     if (path === '/admin/bulk-import-flavors' && method === 'POST') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1070,12 +1107,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import extras (NEW ENDPOINT)
     if (path === '/admin/bulk-import-extras' && method === 'POST') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1133,12 +1171,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import dough types (NEW ENDPOINT)
     if (path === '/admin/bulk-import-dough-types' && method === 'POST') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1243,12 +1282,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Get pizzeria settings
     if (path === '/admin/settings' && method === 'GET') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1296,12 +1336,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update pizzeria settings
     if (path === '/admin/settings' && method === 'PUT') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1388,12 +1429,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
     
     // Admin - Get all dough types
     if (path === '/admin/dough-types' && method === 'GET') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1483,12 +1525,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
     
     // Admin - Get all extra items
     if (path === '/admin/extras' && method === 'GET') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1513,12 +1556,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Create extra item
     if (path === '/admin/extras' && method === 'POST') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1580,12 +1624,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Dashboard data
     if (path === '/admin/dashboard' && method === 'GET') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
