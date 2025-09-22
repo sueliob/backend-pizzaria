@@ -83,54 +83,15 @@ const PIZZERIA_ADDRESS = {
   coordinates: { lat: -23.5236, lng: -46.7031 } // Vila Leopoldina
 };
 
-// Variável global para armazenar configurações da pizzaria (persistência em memória)
+// Variável global para armazenar configurações da pizzaria (será carregada do banco)
 let PIZZERIA_SETTINGS = {
-  businessHours: {
-    monday: { open: '18:00', close: '23:00', isOpen: true },
-    tuesday: { open: '18:00', close: '23:00', isOpen: true },
-    wednesday: { open: '18:00', close: '23:00', isOpen: true },
-    thursday: { open: '18:00', close: '23:00', isOpen: true },
-    friday: { open: '18:00', close: '00:00', isOpen: true },
-    saturday: { open: '18:00', close: '00:00', isOpen: true },
-    sunday: { open: '18:00', close: '23:00', isOpen: true }
-  },
-  contact: {
-    whatsapp: '11935856898',
-    phone: '1133334444',
-    email: 'pizzaria@exemplo.com'
-  },
-  address: {
-    street: 'R. Passo da Pátria',
-    number: '1685',
-    neighborhood: 'Vila Leopoldina',
-    city: 'São Paulo',
-    state: 'SP',
-    cep: '05085-000',
-    coordinates: { lat: -23.5236, lng: -46.7031 }
-  },
-  delivery: {
-    baseFee: 9,
-    feePerRange: 9,
-    kmRange: 3,
-    baseTime: 30,
-    maxDistance: 15
-  },
-  branding: {
-    name: 'BRASCATTA',
-    slogan: 'pizza de qualidade',
-    logoUrl: '/images/logo.png',
-    backgroundUrl: '/images/background.png'
-  },
-  social: {
-    facebook: 'https://facebook.com/brascatta',
-    instagram: 'https://instagram.com/brascatta'
-  },
-  categories: {
-    entradas: 'Entradas',
-    salgadas: 'Pizzas Salgadas', 
-    doces: 'Pizzas Doces',
-    bebidas: 'Bebidas'
-  }
+  businessHours: null,
+  contact: null,
+  address: null,
+  delivery: null,
+  branding: null,
+  social: null,
+  categories: null
 };
 
 // Delivery configuration - Fórmula Original
@@ -1235,15 +1196,30 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Public - Get pizzeria contact (for WhatsApp integration)
     if (path === '/public/contact' && method === 'GET') {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          whatsapp: PIZZERIA_SETTINGS.contact.whatsapp,
-          phone: PIZZERIA_SETTINGS.contact.phone,
-          email: PIZZERIA_SETTINGS.contact.email
-        })
-      };
+      try {
+        const settings = await storage.getAllSettings();
+        const contactSetting = settings.find(s => s.section === 'contact');
+        
+        if (contactSetting) {
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(contactSetting.data)
+          };
+        } else {
+          return {
+            statusCode: 404,
+            headers,
+            body: JSON.stringify({ error: 'Dados de contato não configurados no banco de dados' })
+          };
+        }
+      } catch (error) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: 'Erro ao buscar dados de contato' })
+        };
+      }
     }
 
     // Public - Get basic pizzeria settings (sem autenticação)
@@ -1251,11 +1227,10 @@ export const handler: Handler = async (event: HandlerEvent) => {
       try {
         const settings = await storage.getAllSettings();
         if (settings.length === 0) {
-          // Fallback para variável global se não houver dados no banco
           return {
-            statusCode: 200,
+            statusCode: 404,
             headers,
-            body: JSON.stringify(PIZZERIA_SETTINGS)
+            body: JSON.stringify({ error: 'Configurações não encontradas no banco de dados' })
           };
         }
         
@@ -1271,11 +1246,10 @@ export const handler: Handler = async (event: HandlerEvent) => {
           body: JSON.stringify(settingsObject)
         };
       } catch (error) {
-        // Fallback em caso de erro
         return {
-          statusCode: 200,
+          statusCode: 500,
           headers,
-          body: JSON.stringify(PIZZERIA_SETTINGS)
+          body: JSON.stringify({ error: 'Erro ao buscar configurações do banco de dados' })
         };
       }
     }
@@ -1325,11 +1299,10 @@ export const handler: Handler = async (event: HandlerEvent) => {
         };
       } catch (error) {
         console.error('Erro ao buscar configurações:', error);
-        // Fallback para variável global
         return {
-          statusCode: 200,
+          statusCode: 500,
           headers,
-          body: JSON.stringify(PIZZERIA_SETTINGS)
+          body: JSON.stringify({ error: 'Erro ao buscar configurações do banco de dados' })
         };
       }
     }

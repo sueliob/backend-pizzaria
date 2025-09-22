@@ -474,21 +474,8 @@ app.use((req, res, next) => {
         return res.status(401).json({ error: 'Token inválido' });
       }
       
-      res.json({
-        businessHours: {
-          monday: { open: '18:00', close: '23:00', isOpen: true },
-          tuesday: { open: '18:00', close: '23:00', isOpen: true },
-          wednesday: { open: '18:00', close: '23:00', isOpen: true },
-          thursday: { open: '18:00', close: '23:00', isOpen: true },
-          friday: { open: '18:00', close: '00:00', isOpen: true },
-          saturday: { open: '18:00', close: '00:00', isOpen: true },
-          sunday: { open: '18:00', close: '23:00', isOpen: true }
-        },
-        contact: { whatsapp: '11935856898', phone: '1133334444', email: 'pizzaria@exemplo.com' },
-        address: { street: 'R. Passo da Pátria', number: '1685', neighborhood: 'Vila Leopoldina', city: 'São Paulo', state: 'SP', cep: '05085-000' },
-        delivery: { baseFee: 9, feePerRange: 9, kmRange: 3, baseTime: 30, maxDistance: 15 },
-        branding: { name: 'BRASCATTA', slogan: 'pizza de qualidade', logoUrl: '/images/logo.png', backgroundUrl: '/images/background.png' },
-        categories: { entradas: 'Entradas', salgadas: 'Pizzas Salgadas', doces: 'Pizzas Doces', bebidas: 'Bebidas' }
+      res.status(500).json({
+        error: 'Este endpoint não é mais usado no projeto cloud. Use as APIs do Netlify Functions.'
       });
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch settings' });
