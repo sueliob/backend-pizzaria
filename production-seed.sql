@@ -142,6 +142,7 @@ INSERT INTO pizzeria_settings (id, section, data) VALUES
   "slogan": "A melhor pizza da cidade!",
   "description": "Desde 1995 preparando as melhores pizzas com ingredientes frescos e massa artesanal.",
   "logo": "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200",
+  "backgroundUrl": "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1200",
   "colors": {
     "primary": "#DC2626",
     "secondary": "#059669",
