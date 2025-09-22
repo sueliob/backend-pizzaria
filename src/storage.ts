@@ -231,6 +231,7 @@ export class MemStorage implements IStorage {
       ...extra, 
       available: true, 
       createdAt: new Date(),
+      updatedAt: null,
       description: extra.description ?? null,
       price: extra.price.toString()
     };
@@ -247,6 +248,7 @@ export class MemStorage implements IStorage {
       ...doughType, 
       available: true, 
       createdAt: new Date(),
+      updatedAt: null,
       description: doughType.description ?? null,
       price: doughType.price.toString()
     };

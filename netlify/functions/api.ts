@@ -436,7 +436,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
         console.log('🔍 [Health] Schema no Netlify:', JSON.stringify(schemaCheck));
         
         // 3. Test storage layer sem schema conflicts
-        let testResults = { totalFlavors: 0, salgadasCount: 0, error: null };
+        let testResults: { totalFlavors: number, salgadasCount: number, error: string | null } = { totalFlavors: 0, salgadasCount: 0, error: null };
         try {
           const salgadasTest = await storage.getFlavorsByCategory('salgadas');
           const allFlavorsTest = await storage.getAllFlavors();
@@ -459,7 +459,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
               message: testResults.error ? `ERRO: ${testResults.error}` : 
                        testResults.totalFlavors === 0 ? 'PROBLEMA: Nenhum sabor encontrado!' : 
                        'OK: Sabores encontrados',
-              schemaIssue: !schemaCheck.some(col => col.column_name === 'created_at') ? 'created_at MISSING!' : 'schema OK'
+              schemaIssue: !schemaCheck.rows.some((col: any) => col.column_name === 'created_at') ? 'created_at MISSING!' : 'schema OK'
             }
           })
         };
