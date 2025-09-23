@@ -141,8 +141,8 @@ export class AuthService {
     const isProduction = process.env.NODE_ENV === 'production';
     
     return [
-      `access_token=${tokens.accessToken}; HttpOnly; Secure=${isProduction}; SameSite=Lax; Max-Age=900; Path=/`, // 15min
-      `refresh_token=${tokens.refreshToken}; HttpOnly; Secure=${isProduction}; SameSite=Lax; Max-Age=604800; Path=/` // 7 dias
+      `access_token=${tokens.accessToken}; HttpOnly; Secure=true; SameSite=None; Max-Age=900; Path=/`, // 15min
+      `refresh_token=${tokens.refreshToken}; HttpOnly; Secure=true; SameSite=None; Max-Age=604800; Path=/` // 7 dias
     ];
   }
 
@@ -151,8 +151,8 @@ export class AuthService {
    */
   static generateLogoutCookies(): string[] {
     return [
-      `access_token=; HttpOnly; Secure=true; SameSite=Lax; Max-Age=0; Path=/`,
-      `refresh_token=; HttpOnly; Secure=true; SameSite=Lax; Max-Age=0; Path=/`
+      `access_token=; HttpOnly; Secure=true; SameSite=None; Max-Age=0; Path=/`,
+      `refresh_token=; HttpOnly; Secure=true; SameSite=None; Max-Age=0; Path=/`
     ];
   }
 
