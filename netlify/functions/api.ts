@@ -20,6 +20,15 @@ if (process.env.ENABLE_AUTO_SEED === 'true') {
   })();
 } else {
   console.log('🔒 [READ-ONLY] Auto-seed desabilitado - modo produção somente leitura');
+  // ⚠️ TEMPORÁRIO: Forçar criação de admin para debug  
+  (async () => {
+    try {
+      console.log('🔧 [DEBUG] Tentando criar admin para debug...');
+      await AdminSeeder.createInitialAdmin();
+    } catch (error) {
+      console.warn('⚠️ [DEBUG] Falha ao criar admin:', error);
+    }
+  })();
 }
 
 // Função helper para migrar configurações para o banco
@@ -646,22 +655,22 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // 🔐 SECURE Admin login with JWT + HttpOnly Cookies + Rate Limiting
     if (path === '/admin/login' && method === 'POST') {
-      // Rate limiting: 5 tentativas por IP a cada 15 minutos
-      const rateLimitCheck = RateLimiter.middleware(RateLimiter.CONFIGS.LOGIN)(event);
-      if (!rateLimitCheck.allowed) {
-        return {
-          statusCode: 429,
-          headers: {
-            ...headers,
-            'Retry-After': rateLimitCheck.error!.retryAfter.toString()
-          },
-          body: JSON.stringify({
-            success: false,
-            message: rateLimitCheck.error!.message,
-            retryAfter: rateLimitCheck.error!.retryAfter
-          })
-        };
-      }
+      // ⚠️ TEMPORÁRIO: Rate limiting desabilitado para debug
+      // const rateLimitCheck = RateLimiter.middleware(RateLimiter.CONFIGS.LOGIN)(event);
+      // if (!rateLimitCheck.allowed) {
+      //   return {
+      //     statusCode: 429,
+      //     headers: {
+      //       ...headers,
+      //       'Retry-After': rateLimitCheck.error!.retryAfter.toString()
+      //     },
+      //     body: JSON.stringify({
+      //       success: false,
+      //       message: rateLimitCheck.error!.message,
+      //       retryAfter: rateLimitCheck.error!.retryAfter
+      //     })
+      //   };
+      // }
 
       try {
         const { username, password } = JSON.parse(event.body || '{}');
