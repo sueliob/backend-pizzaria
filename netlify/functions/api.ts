@@ -651,6 +651,54 @@ export const handler: Handler = async (event: HandlerEvent) => {
       };
     }
 
+    // ========== DEBUG ENDPOINTS ==========
+    
+    // 🔧 DEBUG: Forçar criação de admin
+    if (path === '/debug/create-admin' && method === 'POST') {
+      try {
+        console.log('🔧 [DEBUG] Forçando criação de admin...');
+        await AdminSeeder.createInitialAdmin();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ message: 'Admin creation forced' })
+        };
+      } catch (error) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: 'Failed to create admin', message: error instanceof Error ? error.message : 'Unknown error' })
+        };
+      }
+    }
+
+    // 🔧 DEBUG: Verificar se admin existe no banco
+    if (path === '/debug/admin-count' && method === 'GET') {
+      try {
+        const admins = await storage.getAllAdminUsers();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            count: admins.length,
+            admins: admins.map(a => ({
+              id: a.id,
+              username: a.username,
+              email: a.email,
+              role: a.role,
+              isActive: a.isActive
+            }))
+          })
+        };
+      } catch (error) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: 'Database error', message: error instanceof Error ? error.message : 'Unknown error' })
+        };
+      }
+    }
+
     // ========== ADMIN ENDPOINTS ==========
 
     // 🔐 SECURE Admin login with JWT + HttpOnly Cookies + Rate Limiting

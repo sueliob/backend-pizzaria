@@ -15,48 +15,28 @@ export class AdminSeeder {
         return;
       }
 
-      console.log('🌱 [SEEDER] Criando usuários admin iniciais...');
+      console.log('🌱 [SEEDER] Criando admin inicial no banco de dados...');
 
-      // Admin principal
-      const adminPassword = await AuthService.hashPassword('pizzaria123');
+      // Admin inicial fixo - será gerenciado via banco depois
       const adminUser: InsertAdminUser = {
         username: 'admin',
         email: 'admin@pizzaria.com',
-        passwordHash: adminPassword,
+        passwordHash: await AuthService.hashPassword('pizzaria123'),
         role: 'admin',
         isActive: true,
       };
 
       const createdAdmin = await storage.createAdminUser(adminUser);
-      console.log('✅ [SEEDER] Admin criado:', {
+      console.log('✅ [SEEDER] Admin criado no banco:', {
         id: createdAdmin.id,
         username: createdAdmin.username,
         email: createdAdmin.email,
         role: createdAdmin.role
       });
 
-      // Manager adicional
-      const managerPassword = await AuthService.hashPassword('manager123');
-      const managerUser: InsertAdminUser = {
-        username: 'manager',
-        email: 'manager@pizzaria.com',
-        passwordHash: managerPassword,
-        role: 'manager',
-        isActive: true,
-      };
-
-      const createdManager = await storage.createAdminUser(managerUser);
-      console.log('✅ [SEEDER] Manager criado:', {
-        id: createdManager.id,
-        username: createdManager.username,
-        email: createdManager.email,
-        role: createdManager.role
-      });
-
-      console.log('🎉 [SEEDER] Usuários admin iniciais criados com sucesso!');
-      console.log('📝 [SEEDER] Credenciais de acesso:');
-      console.log('   Admin: admin / pizzaria123');
-      console.log('   Manager: manager / manager123');
+      console.log('🎉 [SEEDER] Admin inicial salvo no banco de dados!');
+      console.log('📝 [SEEDER] Login: admin / pizzaria123');
+      console.log('💡 [SEEDER] Altere a senha no painel administrativo após o primeiro login');
 
     } catch (error) {
       console.error('❌ [SEEDER] Erro ao criar admin users:', error);

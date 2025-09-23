@@ -190,9 +190,9 @@ INSERT INTO pizzeria_settings (id, section, data) VALUES
 -- 5. USUÁRIO ADMIN INICIAL
 -- ==============================================
 
--- Senha: admin123 (hash bcrypt)
+-- Senha: pizzaria123 (hash bcrypt)
 INSERT INTO admin_users (id, username, email, password_hash, role, is_active) VALUES
-('g3456789-0123-4567-8901-345678901234', 'admin', 'admin@pizzariaexemplo.com.br', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'owner', true);
+('g3456789-0123-4567-8901-345678901234', 'admin', 'admin@pizzaria.com', '$2b$12$7yX6n/2bv0cxGGlrlwEpPutwUDqBvBnM/2mDskqnjDR2XKBZsJh1K', 'admin', true);
 
 -- ==============================================
 -- FINALIZAÇÃO
@@ -220,6 +220,6 @@ SELECT 'Admin Users' as tabela, count(*) as total FROM admin_users;
 -- 3. Configure as variáveis de ambiente:
 --    READ_ONLY_MODE=false (para permitir admin)
 --    ENABLE_AUTO_SEED=false (não precisa mais)
--- 4. Login admin: admin@pizzariaexemplo.com.br / admin123
+-- 4. Login admin: admin / pizzaria123
 -- 5. Depois de configurar tudo, ative READ_ONLY_MODE=true
 -- ==============================================

@@ -97,9 +97,9 @@ CLOUDINARY_API_SECRET=seu_api_secret
 FRONTEND_URL=https://seu-frontend.pages.dev
 NODE_ENV=production
 
-# Admin (opcional - padrão: admin/123456)
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=sua_senha_segura
+# Credenciais são gerenciadas no banco de dados
+# Login inicial: admin / pizzaria123
+# Altere no painel admin após primeiro acesso
 ```
 
 ### 3. Deploy Automático
