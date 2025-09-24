@@ -754,28 +754,25 @@ export const handler: Handler = async (event: HandlerEvent) => {
         // Atualizar último login
         await storage.updateAdminLastLogin(user.id);
 
-        // Gerar tokens JWT seguros
+        // Gerar tokens JWT simples
         const tokens = AuthService.generateTokens(user);
-        const secureCookies = AuthService.generateSecureCookies(tokens);
 
         console.log(`✅ [AUTH] Login successful: ${user.username} (${user.role})`);
 
         return {
           statusCode: 200,
           headers,
-          multiValueHeaders: {
-            'Set-Cookie': secureCookies
-          },
           body: JSON.stringify({
             success: true,
             message: 'Login realizado com sucesso',
+            token: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user: {
               id: user.id,
               username: user.username,
               email: user.email,
               role: user.role
             }
-            // ⚠️ NÃO retornar tokens no body (só em cookies HttpOnly)
           })
         };
 
@@ -792,26 +789,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
     // 🔐 SECURE Admin logout with token revocation
     if (path === '/admin/logout' && method === 'POST') {
       try {
-        // Extrair refresh token dos cookies
-        const cookies = event.headers.cookie || '';
-        const refreshTokenMatch = cookies.match(/refresh_token=([^;]+)/);
-        const refreshToken = refreshTokenMatch ? refreshTokenMatch[1] : null;
-
-        if (refreshToken) {
-          // Invalidar refresh token
-          AuthService.revokeRefreshToken(refreshToken);
-          console.log('✅ [AUTH] Logout - refresh token revoked');
-        }
-
-        // Limpar cookies
-        const logoutCookies = AuthService.generateLogoutCookies();
+        // Simple logout - client handles token clearing
+        console.log('✅ [AUTH] Logout - client clearing token');
 
         return {
           statusCode: 200,
           headers,
-          multiValueHeaders: {
-            'Set-Cookie': logoutCookies
-          },
           body: JSON.stringify({
             success: true,
             message: 'Logout realizado com sucesso'
