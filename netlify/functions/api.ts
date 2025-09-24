@@ -1460,8 +1460,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
     
     // Admin - Get all dough types
     if (path === '/admin/dough-types' && method === 'GET') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1556,8 +1555,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
     
     // Admin - Get all extra items
     if (path === '/admin/extras' && method === 'GET') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
