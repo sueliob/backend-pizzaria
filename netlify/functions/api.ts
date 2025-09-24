@@ -260,6 +260,41 @@ function getCorsHeaders(origin: string | undefined) {
   };
 }
 
+// 🔧 Helper para verificar autenticação via Bearer token (novo método)
+async function authenticateAdminViaBearerToken(authHeader: string | undefined): Promise<{ userId: string; username: string; role: string } | null> {
+  try {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return null;
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return null;
+    }
+
+    // Verificar access token
+    const payload = AuthService.verifyAccessToken(token);
+    if (!payload) {
+      return null;
+    }
+
+    // Buscar dados atualizados do usuário
+    const user = await storage.getAdminUser(payload.userId);
+    if (!user || !user.isActive) {
+      return null;
+    }
+
+    return {
+      userId: user.id,
+      username: user.username,
+      role: user.role
+    };
+  } catch (error) {
+    console.error('❌ [AUTH] Bearer token authentication failed:', error);
+    return null;
+  }
+}
+
 // 🔧 Helper para verificar autenticação via cookies HttpOnly (padronização)
 async function authenticateAdminViaCookies(cookies: string): Promise<{ userId: string; username: string; role: string } | null> {
   try {
@@ -813,31 +848,17 @@ export const handler: Handler = async (event: HandlerEvent) => {
     // 🔍 SECURE Admin profile check via cookies
     if ((path === '/admin/me' || path.startsWith('/admin/me')) && method === 'GET') {
       try {
-        // Extrair access token dos cookies
-        const cookies = event.headers.cookie || '';
-        const accessTokenMatch = cookies.match(/access_token=([^;]+)/);
-        const accessToken = accessTokenMatch ? accessTokenMatch[1] : null;
-
-        if (!accessToken) {
+        const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+        if (!authResult) {
           return {
             statusCode: 401,
             headers,
-            body: JSON.stringify({ success: false, message: 'Token de acesso não encontrado' })
-          };
-        }
-
-        // Verificar access token
-        const payload = AuthService.verifyAccessToken(accessToken);
-        if (!payload) {
-          return {
-            statusCode: 401,
-            headers,
-            body: JSON.stringify({ success: false, message: 'Token de acesso inválido' })
+            body: JSON.stringify({ success: false, message: 'Token de acesso inválido ou ausente' })
           };
         }
 
         // Buscar dados atualizados do usuário
-        const user = await storage.getAdminUser(payload.userId);
+        const user = await storage.getAdminUser(authResult.userId);
         if (!user || !user.isActive) {
           return {
             statusCode: 401,
@@ -949,11 +970,9 @@ export const handler: Handler = async (event: HandlerEvent) => {
       }
     }
 
-    // 🔒 Admin - Get all flavors with JWT authentication
+    // 🔒 Admin - Get all flavors with Bearer token authentication
     if (path === '/admin/flavors' && method === 'GET') {
-      // Usar sistema de autenticação por cookies HttpOnly
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1296,8 +1315,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Get pizzeria settings
     if (path === '/admin/settings' && method === 'GET') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1637,8 +1655,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Dashboard data
     if (path === '/admin/dashboard' && method === 'GET') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
