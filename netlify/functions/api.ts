@@ -769,14 +769,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
           body: JSON.stringify({
             success: true,
             message: 'Login realizado com sucesso',
-            token: tokens.accessToken, // 🔑 Token para Bearer Authentication
-            refreshToken: tokens.refreshToken, // 🔄 Para renovação
             user: {
               id: user.id,
               username: user.username,
               email: user.email,
               role: user.role
             }
+            // ⚠️ NÃO retornar tokens no body (só em cookies HttpOnly)
           })
         };
 
@@ -828,21 +827,34 @@ export const handler: Handler = async (event: HandlerEvent) => {
       }
     }
 
-    // 🔍 SECURE Admin profile check via Bearer Token
+    // 🔍 SECURE Admin profile check via cookies
     if ((path === '/admin/me' || path.startsWith('/admin/me')) && method === 'GET') {
       try {
-        // Autenticação via Bearer Token
-        const authResult = AuthService.authenticateRequest(event.headers.authorization);
-        if (!authResult) {
+        // Extrair access token dos cookies
+        const cookies = event.headers.cookie || '';
+        const accessTokenMatch = cookies.match(/access_token=([^;]+)/);
+        const accessToken = accessTokenMatch ? accessTokenMatch[1] : null;
+
+        if (!accessToken) {
           return {
             statusCode: 401,
             headers,
-            body: JSON.stringify({ success: false, message: 'Token de acesso ausente ou inválido' })
+            body: JSON.stringify({ success: false, message: 'Token de acesso não encontrado' })
+          };
+        }
+
+        // Verificar access token
+        const payload = AuthService.verifyAccessToken(accessToken);
+        if (!payload) {
+          return {
+            statusCode: 401,
+            headers,
+            body: JSON.stringify({ success: false, message: 'Token de acesso inválido' })
           };
         }
 
         // Buscar dados atualizados do usuário
-        const user = await storage.getAdminUser(authResult.userId);
+        const user = await storage.getAdminUser(payload.userId);
         if (!user || !user.isActive) {
           return {
             statusCode: 401,
@@ -956,8 +968,9 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // 🔒 Admin - Get all flavors with JWT authentication
     if (path === '/admin/flavors' && method === 'GET') {
-      // Usar sistema de autenticação por Bearer Token
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      // Usar sistema de autenticação por cookies HttpOnly
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1016,7 +1029,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Delete flavor
     if (path.startsWith('/admin/flavors/') && method === 'DELETE') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1045,7 +1059,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import flavors (NEW ENDPOINT)
     if (path === '/admin/bulk-import-flavors' && method === 'POST') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1110,7 +1125,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import extras (NEW ENDPOINT)
     if (path === '/admin/bulk-import-extras' && method === 'POST') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1173,7 +1189,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import dough types (NEW ENDPOINT)
     if (path === '/admin/bulk-import-dough-types' && method === 'POST') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1296,7 +1313,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Get pizzeria settings
     if (path === '/admin/settings' && method === 'GET') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1348,7 +1366,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update pizzeria settings
     if (path === '/admin/settings' && method === 'PUT') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1440,7 +1459,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
     
     // Admin - Get all dough types
     if (path === '/admin/dough-types' && method === 'GET') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1535,7 +1555,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
     
     // Admin - Get all extra items
     if (path === '/admin/extras' && method === 'GET') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1565,7 +1586,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Create extra item
     if (path === '/admin/extras' && method === 'POST') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1632,7 +1654,8 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Dashboard data
     if (path === '/admin/dashboard' && method === 'GET') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const cookies = event.headers.cookie || '';
+      const authResult = await authenticateAdminViaCookies(cookies);
       if (!authResult) {
         return {
           statusCode: 401,
