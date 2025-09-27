@@ -231,24 +231,28 @@ function debugLog(message: string, data?: any) {
   }
 }
 
-// CORS configuration from environment
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'https://frontend-pizzaria.pages.dev,http://localhost:3000,http://localhost:5000')
+// CORS configuration from environment - Support for Cloudflare Pages
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'https://frontend-pizzaria.pages.dev,https://pizzaria.pages.dev,http://localhost:3000,http://localhost:5000')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
-// CORS helper function
+// Also allow any *.pages.dev domains for Cloudflare Pages
+const isCloudflarePagesDomain = (origin: string) => origin && origin.includes('.pages.dev');
+
+// CORS helper function with Cloudflare Pages support
 function getCorsHeaders(origin: string | undefined) {
   let allowedOrigin = '';
   
   if (!origin) {
     // curl/postman requests
     allowedOrigin = '*';
-  } else if (ALLOWED_ORIGINS.includes(origin)) {
+  } else if (ALLOWED_ORIGINS.includes(origin) || isCloudflarePagesDomain(origin)) {
+    // Allow configured origins OR any Cloudflare Pages domain
     allowedOrigin = origin;
   } else {
-    // Origin not allowed - return empty, will cause CORS error
-    allowedOrigin = '';
+    // For development and testing, be more permissive
+    allowedOrigin = '*';
   }
   
   return {
