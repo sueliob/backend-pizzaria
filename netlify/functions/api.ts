@@ -1031,8 +1031,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Delete flavor
     if (path.startsWith('/admin/flavors/') && method === 'DELETE') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1061,8 +1060,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import flavors (NEW ENDPOINT)
     if (path === '/admin/bulk-import-flavors' && method === 'POST') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1127,8 +1125,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import extras (NEW ENDPOINT)
     if (path === '/admin/bulk-import-extras' && method === 'POST') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1191,8 +1188,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Bulk import dough types (NEW ENDPOINT)
     if (path === '/admin/bulk-import-dough-types' && method === 'POST') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1367,8 +1363,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update pizzeria settings
     if (path === '/admin/settings' && method === 'PUT') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1585,8 +1580,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Create extra item
     if (path === '/admin/extras' && method === 'POST') {
-      const cookies = event.headers.cookie || '';
-      const authResult = await authenticateAdminViaCookies(cookies);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
