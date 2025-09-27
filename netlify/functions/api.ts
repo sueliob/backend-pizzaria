@@ -893,21 +893,17 @@ export const handler: Handler = async (event: HandlerEvent) => {
       }
     }
 
-    // 🔄 SECURE Token refresh with rotation
+    // 🔄 Token refresh no longer needed with Bearer authentication
     if (path === '/admin/refresh' && method === 'POST') {
-      try {
-        // Extrair refresh token dos cookies
-        const cookies = event.headers.cookie || '';
-        const refreshTokenMatch = cookies.match(/refresh_token=([^;]+)/);
-        const refreshToken = refreshTokenMatch ? refreshTokenMatch[1] : null;
-
-        if (!refreshToken) {
-          return {
-            statusCode: 401,
-            headers,
-            body: JSON.stringify({ success: false, message: 'Refresh token não encontrado' })
-          };
-        }
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ 
+          success: true, 
+          message: 'Token refresh não necessário com Bearer authentication - faça novo login se necessário' 
+        })
+      };
+    }
 
         // Verificar refresh token
         const decoded = AuthService.verifyRefreshToken(refreshToken);
@@ -1001,7 +997,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // 🔒 Admin - Create flavor with JWT authentication  
     if (path === '/admin/flavors' && method === 'POST') {
-      const authResult = AuthService.authenticateRequest(event.headers.authorization);
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
       if (!authResult) {
         return {
           statusCode: 401,
@@ -1481,12 +1477,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Create dough type
     if (path === '/admin/dough-types' && method === 'POST') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1507,12 +1503,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update dough type
     if (path.startsWith('/admin/dough-types/') && method === 'PUT') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1528,12 +1524,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Delete dough type
     if (path.startsWith('/admin/dough-types/') && method === 'DELETE') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1606,12 +1602,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update extra item
     if (path.startsWith('/admin/extras/') && method === 'PUT') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1627,12 +1623,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Delete extra item
     if (path.startsWith('/admin/extras/') && method === 'DELETE') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1696,12 +1692,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update flavor/product
     if (path.startsWith('/admin/flavors/') && method === 'PUT') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1792,12 +1788,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Upload image
     if (path === '/admin/upload-image' && method === 'POST') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1818,12 +1814,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update dough type
     if (path.startsWith('/admin/dough-types/') && method === 'PUT') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1847,12 +1843,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update extra item
     if (path.startsWith('/admin/extras/') && method === 'PUT' && !path.includes('/admin/extras')) {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
@@ -1876,12 +1872,12 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
     // Admin - Update credentials
     if (path === '/admin/update-credentials' && method === 'PUT') {
-      const token = event.headers.authorization?.replace('Bearer ', '');
-      if (!token || !token.startsWith('admin_')) {
+      const authResult = await authenticateAdminViaBearerToken(event.headers.authorization);
+      if (!authResult) {
         return {
           statusCode: 401,
           headers,
-          body: JSON.stringify({ error: 'Token inválido' })
+          body: JSON.stringify({ error: 'Token inválido ou ausente' })
         };
       }
 
