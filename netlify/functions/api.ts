@@ -1464,19 +1464,21 @@ export const handler: Handler = async (event: HandlerEvent) => {
         };
       }
 
-      const doughTypes = [
-        { id: '1', name: 'Massa Tradicional', description: 'Massa tradicional da casa', price: '0', category: 'salgadas', available: true },
-        { id: '2', name: 'Massa Fina', description: 'Massa fina e crocante', price: '0', category: 'salgadas', available: true },
-        { id: '3', name: 'Massa Doce Tradicional', description: 'Massa doce tradicional', price: '0', category: 'doces', available: true },
-        { id: '4', name: 'Massa de Chocolate', description: 'Massa com chocolate', price: '3.00', category: 'doces', available: true },
-        { id: '5', name: 'Massa de Baunilha', description: 'Massa com baunilha', price: '2.50', category: 'doces', available: true }
-      ];
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify(doughTypes)
-      };
+      try {
+        const doughTypes = await storage.getAllDoughTypes();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(doughTypes)
+        };
+      } catch (error) {
+        debugLog(`❌ Erro ao buscar tipos de massa do banco:`, error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: 'Erro ao buscar tipos de massa' })
+        };
+      }
     }
 
     // Admin - Create dough type
@@ -1559,23 +1561,21 @@ export const handler: Handler = async (event: HandlerEvent) => {
         };
       }
 
-      const extraItems = [
-        { id: '1', name: 'Queijo Extra', description: 'Porção extra de queijo', price: '5.00', category: 'salgadas', available: true },
-        { id: '2', name: 'Bacon', description: 'Bacon crocante', price: '8.00', category: 'salgadas', available: true },
-        { id: '3', name: 'Catupiry', description: 'Catupiry original', price: '6.00', category: 'salgadas', available: true },
-        { id: '4', name: 'CHOCOLATE BRANCO', description: 'Chocolate branco cremoso', price: '8.00', category: 'doces', available: true },
-        { id: '5', name: 'CHOCOLATE AO LEITE', description: 'Chocolate ao leite derretido', price: '8.00', category: 'doces', available: true },
-        { id: '6', name: 'GRANULADO', description: 'Granulado colorido', price: '4.00', category: 'doces', available: true },
-        { id: '7', name: 'LEITE CONDENSADO', description: 'Leite condensado cremoso', price: '6.00', category: 'doces', available: true },
-        { id: '8', name: 'COCO RALADO', description: 'Coco ralado fresco', price: '5.00', category: 'doces', available: true },
-        { id: '9', name: 'FRUTAS VERMELHAS', description: 'Mix de frutas vermelhas', price: '7.00', category: 'doces', available: true }
-      ];
-
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify(extraItems)
-      };
+      try {
+        const extraItems = await storage.getAllExtras();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(extraItems)
+        };
+      } catch (error) {
+        debugLog(`❌ Erro ao buscar extras do banco:`, error);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({ error: 'Erro ao buscar extras' })
+        };
+      }
     }
 
     // Admin - Create extra item
